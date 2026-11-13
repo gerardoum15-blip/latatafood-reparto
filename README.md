@@ -3,10 +3,10 @@
 App web pequeña para el reparto a domicilio:
 
 - **Administrador**: crea el pedido (cliente, WhatsApp, dirección, referencia, ubicación, detalle, total y forma de pago con vuelto), asigna el motorizado, cambia los estados y envía al cliente su enlace de seguimiento por WhatsApp. Ve a los motorizados en un mapa en vivo y gestiona el personal (cada uno con su PIN).
-- **Motorizado**: ve solo sus pedidos con nombre, botones de WhatsApp y llamada, dirección con Google Maps / Waze y cuánto cobrar (con vuelto). Avanza: *Recogí el pedido → Salir en ruta → Entregado*. Comparte su GPS automáticamente mientras reparte.
+- **Motorizado**: ve solo sus pedidos con nombre, botones de WhatsApp y llamada, dirección con Google Maps / Waze y cuánto cobrar (con vuelto). Maneja los estados: *Salir en camino → Marcar entregado*. Comparte su GPS automáticamente mientras reparte.
 - **Cliente**: abre su enlace (`…/#seguir/CODIGO`) sin instalar nada y ve los 5 estados y, cuando el pedido está *En ruta*, al motorizado moviéndose en el mapa y la distancia que falta. Puede cerrar la página y volver a abrir el enlace cuando quiera.
 
-Estados: Pedido confirmado · En preparación · En despacho · En ruta hacia su destino · Pedido entregado.
+Estados (los cambia el driver): Pedido confirmado y en preparación · En camino hacia tu ubicación · Pedido entregado.
 
 ## Puesta en marcha
 

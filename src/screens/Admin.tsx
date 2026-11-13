@@ -3,7 +3,7 @@ import { api } from '../api';
 import { BUSINESS } from '../config';
 import { usePoll } from '../hooks';
 import type { Order, Session, Staff, Status } from '../types';
-import { STATUS_LABEL, STEPS, chargeText, customerMessage, minutesAgo, nextStatus, orderNo, pad, time, trackUrl, waLink } from '../lib';
+import { STATUS_LABEL, STEPS, chargeText, customerMessage, minutesAgo, orderNo, stepIndex, pad, time, trackUrl, waLink } from '../lib';
 import { Badge, Modal, copy, errMsg, toast } from '../components/ui';
 import { LiveMap, type MapPoint } from '../components/Map';
 import { OrderForm } from './OrderForm';
@@ -13,6 +13,9 @@ import { TopBar, useSessionGuard } from './shared';
 type Tab = 'pedidos' | 'mapa' | 'personal';
 type Filter = 'activos' | 'entregados' | 'todos' | Status;
 const ACTIVE: Status[] = ['confirmado', 'preparacion', 'despacho', 'ruta'];
+/** Cuadros de la cola: en preparación (incluye estados antiguos) y en camino. */
+const BOXES: Status[] = ['confirmado', 'ruta'];
+const same = (a: Status, b: Status) => stepIndex(a) === stepIndex(b);
 
 export function Admin({ session, onOut }: { session: Session; onOut: () => void }) {
   const [tab, setTab] = useState<Tab>('pedidos');
@@ -47,11 +50,11 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
   const [created, setCreated] = useState<Order | null>(null);
   // Cola: los activos van por estado y, dentro de cada estado, el más antiguo primero.
   const list = orders
-    .filter((o) => filter === 'todos' || (filter === 'activos' ? ACTIVE.includes(o.status) : filter === 'entregados' ? !ACTIVE.includes(o.status) : o.status === filter))
+    .filter((o) => filter === 'todos' || (filter === 'activos' ? ACTIVE.includes(o.status) : filter === 'entregados' ? !ACTIVE.includes(o.status) : same(o.status, filter as Status)))
     .sort((a, b) => filter === 'activos' || ACTIVE.includes(filter as Status)
-      ? ACTIVE.indexOf(a.status) - ACTIVE.indexOf(b.status) || a.created_at.localeCompare(b.created_at)
+      ? stepIndex(b.status) - stepIndex(a.status) || a.created_at.localeCompare(b.created_at)
       : b.created_at.localeCompare(a.created_at));
-  const count = (s: Status) => orders.filter((o) => o.status === s).length;
+  const count = (s: Status) => orders.filter((o) => same(o.status, s)).length;
 
   const setStatus = async (o: Order, s: Status) => {
     try { await api.setStatus(session.token, o.id, s); await refresh(); toast(`#${orderNo(o)} → ${STATUS_LABEL[s]}`); }
@@ -77,7 +80,7 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
         <button className="btn primary" onClick={() => setEditing('new')}>＋ Nuevo pedido</button>
       </div>
       <div className="queue" role="group" aria-label="Pedidos por estado">
-        {ACTIVE.map((st) => (
+        {BOXES.map((st) => (
           <button key={st} className={`queue-box st-${st} ${filter === st ? 'on' : ''}`} onClick={() => setFilter(filter === st ? 'activos' : st)} aria-pressed={filter === st}>
             <b>{count(st)}</b><span>{STATUS_LABEL[st]}</span>
           </button>
@@ -91,7 +94,6 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
       {loaded && !list.length && <div className="empty">{filter === 'activos' ? 'No hay pedidos en cola. Crea uno con “Nuevo pedido”.' : 'No hay pedidos en este estado.'}</div>}
       <div className="cards">
         {list.map((o) => {
-          const next = nextStatus(o.status);
           return (
             <article key={o.id} className={`card order st-${o.status}`}>
               <header className="row between">
@@ -110,7 +112,6 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
                   <option value="">🛵 Sin motorizado</option>
                   {drivers.map((d) => <option key={d.id} value={d.id}>🛵 {d.name}</option>)}
                 </select>
-                {next && <button className="btn primary grow" onClick={() => setStatus(o, next)}>→ {STATUS_LABEL[next]}</button>}
               </div>
               <div className="row gap wrap actions">
                 <a className="btn small wa" href={waLink(o.customer_phone, customerMessage(o, BUSINESS))} target="_blank" rel="noreferrer">WhatsApp al cliente</a>
@@ -118,8 +119,8 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
                 <a className="btn small" href={`#seguir/${o.code}`} target="_blank" rel="noreferrer">Ver rastreo</a>
                 <button className="btn small" onClick={() => setEditing(o)}>Editar</button>
                 <select className="small-select" value="" onChange={(e) => e.target.value && setStatus(o, e.target.value as Status)} aria-label="Cambiar estado">
-                  <option value="">Cambiar estado…</option>
-                  {[...STEPS.map((s) => s.key), 'anulado' as Status].filter((s) => s !== o.status).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+                  <option value="">Corregir estado…</option>
+                  {[...STEPS.map((s) => s.key), 'anulado' as Status].filter((s) => !same(s, o.status) || (s === 'anulado') !== (o.status === 'anulado')).map((s) => <option key={s} value={s}>{s === 'anulado' ? 'Anular pedido' : STEPS.find((x) => x.key === s)!.label}</option>)}
                 </select>
                 {(o.status === 'anulado' || o.status === 'confirmado') && <button className="btn small danger" onClick={() => remove(o)}>Borrar</button>}
               </div>
@@ -150,7 +151,7 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
 }
 
 function Progress({ status }: { status: Status }) {
-  const i = STEPS.findIndex((s) => s.key === status);
+  const i = stepIndex(status);
   if (status === 'anulado') return null;
   return (
     <ol className="mini-steps" aria-label={`Estado: ${STATUS_LABEL[status]}`}>

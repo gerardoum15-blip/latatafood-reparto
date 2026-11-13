@@ -14,11 +14,11 @@ export function Driver({ session, onOut }: { session: Session; onOut: () => void
   const orders = usePoll(() => guard(api.listOrders(session.token)), 6000, [session.token]);
   const list = orders.data ?? [];
   // Ordenados: primero el que va en ruta, luego los listos para recoger, y del más antiguo al más nuevo.
-  const RANK: Record<string, number> = { ruta: 0, despacho: 1, preparacion: 2, confirmado: 3 };
+  const RANK: Record<string, number> = { ruta: 0, despacho: 1, preparacion: 1, confirmado: 1 };
   const active = list.filter((o) => !['entregado', 'anulado'].includes(o.status))
     .sort((a, b) => RANK[a.status] - RANK[b.status] || a.created_at.localeCompare(b.created_at));
   const done = list.filter((o) => o.status === 'entregado');
-  const onRoute = active.some((o) => o.status === 'ruta' || o.status === 'despacho');
+  const onRoute = active.some((o) => o.status === 'ruta');
 
   // El GPS se enciende solo al salir a reparto; también se puede encender a mano.
   const [manual, setManual] = useState(() => { try { return localStorage.getItem(GPS_KEY) === '1'; } catch { return false; } });
@@ -81,8 +81,7 @@ export function Driver({ session, onOut }: { session: Session; onOut: () => void
 function DriverCard({ o, pos, onStatus }: { o: Order; pos: number; onStatus: (s: Status) => void }) {
   const hasDest = o.dest_lat != null && o.dest_lng != null;
   const action: { s: Status; label: string } | null =
-    o.status === 'confirmado' || o.status === 'preparacion' ? { s: 'despacho', label: '📦 Recogí el pedido' }
-      : o.status === 'despacho' ? { s: 'ruta', label: '🛵 Salir en ruta' }
+    o.status === 'confirmado' || o.status === 'preparacion' || o.status === 'despacho' ? { s: 'ruta', label: '🛵 Salir en camino' }
       : o.status === 'ruta' ? { s: 'entregado', label: '✅ Marcar entregado' } : null;
   return (
     <article className={`card order driver st-${o.status}`}>
@@ -120,7 +119,6 @@ function DriverCard({ o, pos, onStatus }: { o: Order; pos: number; onStatus: (s:
       {o.items && <section><p className="field-label">Pedido</p><p className="pre small">{o.items}</p></section>}
       {o.notes && <p className="note">📝 {o.notes}</p>}
 
-      {(o.status === 'confirmado' || o.status === 'preparacion') && <p className="muted small">La cocina aún lo está preparando.</p>}
       {action && <button className={`btn block ${action.s === 'entregado' ? 'ok' : 'primary'} big-btn`} onClick={() => onStatus(action.s)}>{action.label}</button>}
       {o.status === 'ruta' && (
         <a className="btn block small" href={waLink(o.customer_phone, `Hola ${o.customer_name.split(' ')[0]}, soy el motorizado de ${BUSINESS}. Ya estoy en tu dirección con tu pedido #${orderNo(o)}.`)} target="_blank" rel="noreferrer">Avisar “ya llegué” por WhatsApp</a>
@@ -136,7 +134,7 @@ function GpsBar({ state, on, auto, manual, setManual, last, awake }: {
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 5000); return () => clearInterval(t); }, []);
   const ago = last ? Math.round((Date.now() - last.at) / 1000) : null;
   const msg: Record<GpsState, string> = {
-    off: 'Ubicación apagada. Se enciende sola al recoger un pedido.',
+    off: 'Ubicación apagada. Se enciende sola al tocar “Salir en camino”.',
     waiting: 'Buscando señal GPS…',
     ok: `Compartiendo ubicación${ago != null ? ` · enviada hace ${ago}s` : ''}${last ? ` · ±${Math.round(last.acc)} m` : ''}`,
     denied: 'Permiso de ubicación bloqueado. Actívalo en los ajustes del navegador para este sitio.',

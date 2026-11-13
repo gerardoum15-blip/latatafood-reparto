@@ -204,8 +204,7 @@ a { color: inherit; }
 .toast.err { background: var(--danger); }
 
 /* Cola de pedidos por estado */
-.queue { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-@media (max-width: 560px) { .queue { grid-template-columns: repeat(3, 1fr); } }
+.queue { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .queue-box { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; background: var(--surface); box-shadow: var(--shadow); }
 .queue-box b { font-size: 1.6rem; line-height: 1; }
 .queue-box span { font-size: 0.78rem; font-weight: 600; text-align: center; }

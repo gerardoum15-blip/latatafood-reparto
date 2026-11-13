@@ -1,17 +1,17 @@
 import type { Order, Payment, Status } from './types';
 
+/** Los 3 estados que ve el cliente. Los cambia el driver. */
 export const STEPS: { key: Status; label: string; icon: string }[] = [
-  { key: 'confirmado', label: 'Pedido confirmado', icon: '✅' },
-  { key: 'preparacion', label: 'En preparación', icon: '👩‍🍳' },
-  { key: 'despacho', label: 'En despacho', icon: '📦' },
-  { key: 'ruta', label: 'En ruta hacia su destino', icon: '🛵' },
+  { key: 'confirmado', label: 'Pedido confirmado y en preparación', icon: '👩‍🍳' },
+  { key: 'ruta', label: 'En camino hacia tu ubicación', icon: '🛵' },
   { key: 'entregado', label: 'Pedido entregado', icon: '🎉' },
 ];
 export const STATUS_LABEL: Record<Status, string> = {
-  confirmado: 'Confirmado', preparacion: 'En preparación', despacho: 'En despacho',
-  ruta: 'En ruta', entregado: 'Entregado', anulado: 'Anulado',
+  confirmado: 'En preparación', preparacion: 'En preparación', despacho: 'En preparación',
+  ruta: 'En camino', entregado: 'Entregado', anulado: 'Anulado',
 };
-export const stepIndex = (s: Status) => STEPS.findIndex((x) => x.key === s);
+/** "preparacion" y "despacho" son de la versión anterior: cuentan como el primer paso. */
+export const stepIndex = (s: Status) => (s === 'preparacion' || s === 'despacho' ? 0 : STEPS.findIndex((x) => x.key === s));
 export const nextStatus = (s: Status): Status | null => {
   const i = stepIndex(s);
   return i >= 0 && i < STEPS.length - 1 ? STEPS[i + 1].key : null;
@@ -92,10 +92,10 @@ export function customerMessage(o: Order, business: string): string {
   const name = o.customer_name.split(' ')[0];
   const no = ` #${orderNo(o)}`;
   const body: Record<Status, string> = {
-    confirmado: `Confirmamos tu pedido${no} (pago: ${payLabel(o)}).`,
+    confirmado: `Confirmamos tu pedido${no} y ya se está preparando (pago: ${payLabel(o)}).`,
     preparacion: `Tu pedido${no} ya se está preparando.`,
-    despacho: `Tu pedido${no} está listo y lo estamos despachando.`,
-    ruta: `Tu pedido${no} va en camino${o.driver_name ? ` con ${o.driver_name.split(' ')[0]}` : ''}. Puedes ver al motorizado en el mapa.`,
+    despacho: `Tu pedido${no} ya se está preparando.`,
+    ruta: `Tu pedido${no} va en camino hacia tu ubicación${o.driver_name ? ` con ${o.driver_name.split(' ')[0]}` : ''}. Puedes ver al driver en el mapa.`,
     entregado: `Tu pedido${no} fue entregado. ¡Gracias por tu compra, que lo disfrutes!`,
     anulado: `Tu pedido${no} fue anulado. Escríbenos si tienes alguna duda.`,
   };
