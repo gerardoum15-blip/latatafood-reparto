@@ -11,7 +11,7 @@ import { StaffList } from './StaffList';
 import { TopBar, useSessionGuard } from './shared';
 
 type Tab = 'pedidos' | 'mapa' | 'personal';
-type Filter = 'activos' | 'entregados' | 'todos';
+type Filter = 'activos' | 'entregados' | 'todos' | Status;
 const ACTIVE: Status[] = ['confirmado', 'preparacion', 'despacho', 'ruta'];
 
 export function Admin({ session, onOut }: { session: Session; onOut: () => void }) {
@@ -45,7 +45,13 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
   const [filter, setFilter] = useState<Filter>('activos');
   const [editing, setEditing] = useState<Order | 'new' | null>(null);
   const [created, setCreated] = useState<Order | null>(null);
-  const list = orders.filter((o) => filter === 'todos' || (filter === 'activos' ? ACTIVE.includes(o.status) : !ACTIVE.includes(o.status)));
+  // Cola: los activos van por estado y, dentro de cada estado, el más antiguo primero.
+  const list = orders
+    .filter((o) => filter === 'todos' || (filter === 'activos' ? ACTIVE.includes(o.status) : filter === 'entregados' ? !ACTIVE.includes(o.status) : o.status === filter))
+    .sort((a, b) => filter === 'activos' || ACTIVE.includes(filter as Status)
+      ? ACTIVE.indexOf(a.status) - ACTIVE.indexOf(b.status) || a.created_at.localeCompare(b.created_at)
+      : b.created_at.localeCompare(a.created_at));
+  const count = (s: Status) => orders.filter((o) => o.status === s).length;
 
   const setStatus = async (o: Order, s: Status) => {
     try { await api.setStatus(session.token, o.id, s); await refresh(); toast(`#${orderNo(o)} → ${STATUS_LABEL[s]}`); }
@@ -70,9 +76,19 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
         </div>
         <button className="btn primary" onClick={() => setEditing('new')}>＋ Nuevo pedido</button>
       </div>
+      <div className="queue" role="group" aria-label="Pedidos por estado">
+        {ACTIVE.map((st) => (
+          <button key={st} className={`queue-box st-${st} ${filter === st ? 'on' : ''}`} onClick={() => setFilter(filter === st ? 'activos' : st)} aria-pressed={filter === st}>
+            <b>{count(st)}</b><span>{STATUS_LABEL[st]}</span>
+          </button>
+        ))}
+        <button className={`queue-box st-entregado ${filter === 'entregados' ? 'on' : ''}`} onClick={() => setFilter(filter === 'entregados' ? 'activos' : 'entregados')} aria-pressed={filter === 'entregados'}>
+          <b>{count('entregado')}</b><span>Entregados</span>
+        </button>
+      </div>
       {Boolean(error) && <p className="err-text">No se pudo actualizar: {errMsg(error)}</p>}
       {!loaded && <p className="muted">Cargando…</p>}
-      {loaded && !list.length && <div className="empty">{filter === 'activos' ? 'No hay pedidos activos. Crea uno con “Nuevo pedido”.' : 'Sin pedidos en los últimos 2 días.'}</div>}
+      {loaded && !list.length && <div className="empty">{filter === 'activos' ? 'No hay pedidos en cola. Crea uno con “Nuevo pedido”.' : 'No hay pedidos en este estado.'}</div>}
       <div className="cards">
         {list.map((o) => {
           const next = nextStatus(o.status);

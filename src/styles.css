@@ -202,3 +202,16 @@ a { color: inherit; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translate(-50%, 120px); background: var(--text); color: #fff; padding: 12px 18px; border-radius: 12px; z-index: 2000; transition: transform 0.25s; max-width: calc(100% - 32px); font-weight: 600; }
 .toast.show { transform: translate(-50%, 0); }
 .toast.err { background: var(--danger); }
+
+/* Cola de pedidos por estado */
+.queue { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+@media (max-width: 560px) { .queue { grid-template-columns: repeat(3, 1fr); } }
+.queue-box { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; background: var(--surface); box-shadow: var(--shadow); }
+.queue-box b { font-size: 1.6rem; line-height: 1; }
+.queue-box span { font-size: 0.78rem; font-weight: 600; text-align: center; }
+.queue-box.st-confirmado { background: #eceff3; color: #374151; }
+.queue-box.st-preparacion { background: var(--warn-soft); color: var(--warn); }
+.queue-box.st-despacho { background: var(--info-soft); color: var(--info); }
+.queue-box.st-ruta { background: var(--brand-soft); color: var(--brand); }
+.queue-box.st-entregado { background: var(--ok-soft); color: var(--ok); }
+.queue-box.on { border-color: currentColor; }
