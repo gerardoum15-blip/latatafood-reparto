@@ -3,7 +3,7 @@ import { api } from '../api';
 import { BUSINESS } from '../config';
 import { useGps, usePoll, useWakeLock, type GpsState } from '../hooks';
 import type { Order, Session, Status } from '../types';
-import { PAYMENT_ICON, PAYMENT_LABEL, STATUS_LABEL, chargeText, customerMessage, mapsLink, money, orderNo, pad, telLink, time, waLink, wazeLink } from '../lib';
+import { PAYMENT_ICON, PAYMENT_LABEL, STATUS_LABEL, chargeText, customerMessage, payLabel, mapsLink, money, orderNo, pad, telLink, time, waLink, wazeLink } from '../lib';
 import { Badge, errMsg, toast } from '../components/ui';
 import { TopBar, useSessionGuard } from './shared';
 
@@ -59,12 +59,12 @@ export function Driver({ session, onOut }: { session: Session; onOut: () => void
         </div>
         {done.length > 0 && (
           <details className="card done-list">
-            <summary><b>Entregados hoy: {done.length}</b> · efectivo cobrado {money(cash)}</summary>
+            <summary><b>Entregados hoy: {done.length}</b>{cash > 0 ? ` · efectivo cobrado ${money(cash)}` : ''}</summary>
             <ul className="plain">
               {done.map((o) => (
                 <li key={o.id} className="row between small">
                   <span>#{orderNo(o)} {o.customer_name}</span>
-                  <span>{PAYMENT_LABEL[o.payment]} {money(o.amount)} · {time(o.times.entregado)}</span>
+                  <span>{payLabel(o)} · {time(o.times.entregado)}</span>
                 </li>
               ))}
             </ul>
@@ -109,7 +109,7 @@ function DriverCard({ o, onStatus }: { o: Order; onStatus: (s: Status) => void }
       <section className={`pay pay-${o.payment}`}>
         <span className="pay-icon" aria-hidden>{PAYMENT_ICON[o.payment]}</span>
         <div>
-          <b>{PAYMENT_LABEL[o.payment]} · {money(o.amount)}</b>
+          <b>{payLabel(o)}</b>
           <div className="small">{chargeText(o)}</div>
         </div>
       </section>

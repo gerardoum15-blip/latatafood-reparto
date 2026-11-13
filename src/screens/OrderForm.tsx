@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api';
 import type { Order, Payment, Session, Staff } from '../types';
-import { PAYMENT_ICON, PAYMENT_LABEL, money, parseCoords } from '../lib';
+import { PAYMENT_ICON, PAYMENT_LABEL, parseCoords } from '../lib';
 import { Field, Modal, errMsg } from '../components/ui';
 import { PickMap } from '../components/Map';
 
@@ -29,20 +29,17 @@ export function OrderForm({ session, order, drivers, onClose, onSaved }: {
     if (c) { setDest(c); setShowMap(true); }
   };
 
-  const amount = Number(f.amount) || 0;
-  const payWith = Number(f.pay_with) || 0;
 
   const save = async () => {
     setErr('');
     if (!f.ticket.trim()) return setErr('Escribe el N° de ticket.');
     if (!f.customer_name.trim()) return setErr('Escribe el nombre del cliente.');
     if (f.customer_phone.replace(/\D/g, '').length < 9) return setErr('Escribe el WhatsApp del cliente (9 dígitos).');
-    if (!f.address.trim()) return setErr('Escribe la dirección.');
-    if (f.payment === 'efectivo' && payWith && payWith < amount) return setErr('"Paga con" no puede ser menor que el total.');
+    if (!f.address.trim()) return setErr('Escribe la ubicación.');
     setBusy(true);
     try {
       const o = await api.saveOrder(session.token, {
-        ...f, id: order?.id, amount, pay_with: f.payment === 'efectivo' && payWith ? payWith : null,
+        ...f, id: order?.id, amount: Number(f.amount) || 0, pay_with: f.payment === 'efectivo' && Number(f.pay_with) ? Number(f.pay_with) : null,
         dest_lat: dest?.lat ?? null, dest_lng: dest?.lng ?? null,
       });
       onSaved(o, !order);
@@ -60,19 +57,17 @@ export function OrderForm({ session, order, drivers, onClose, onSaved }: {
     >
       <div className="form-grid">
         <div className="full">
-          <Field label="N° de ticket" hint="El número que aparece arriba en el ticket. El cliente lo usa, junto con los últimos 4 dígitos de su celular, para ver su pedido.">
+          <Field label="N° de ticket" hint="El número de arriba del ticket. Con él y los últimos 4 dígitos de su celular, el cliente ve su pedido.">
             <input value={f.ticket} onChange={set('ticket')} placeholder="Ej. 0458" autoComplete="off" autoFocus={!order} />
           </Field>
         </div>
-        <h3 className="full">Cliente</h3>
-        <Field label="Nombre"><input value={f.customer_name} onChange={set('customer_name')} autoComplete="off" /></Field>
-        <Field label="WhatsApp"><input value={f.customer_phone} onChange={set('customer_phone')} inputMode="tel" placeholder="987 654 321" autoComplete="off" /></Field>
-        <div className="full"><Field label="Dirección"><input value={f.address} onChange={set('address')} placeholder="Av. ... 123, distrito" /></Field></div>
-        <div className="full"><Field label="Referencia"><input value={f.reference} onChange={set('reference')} placeholder="Frente al parque, puerta verde…" /></Field></div>
+        <Field label="Nombre del cliente"><input value={f.customer_name} onChange={set('customer_name')} autoComplete="off" /></Field>
+        <Field label="WhatsApp / celular"><input value={f.customer_phone} onChange={set('customer_phone')} inputMode="tel" placeholder="987 654 321" autoComplete="off" /></Field>
         <div className="full">
-          <Field label="Ubicación (opcional)" hint="Pega el enlace de Google Maps o la ubicación que envió el cliente, o márcala en el mapa. Con el punto marcado, el cliente ve en el mapa cuánto le falta al motorizado.">
-            <input value={f.maps_url} onChange={(e) => onMapsUrl(e.target.value)} placeholder="https://maps.app.goo.gl/… o -12.05, -77.04" />
+          <Field label="Ubicación" hint="Escribe la dirección y, si el cliente envió su ubicación, pega el enlace de Google Maps o márcala en el mapa.">
+            <input value={f.address} onChange={set('address')} placeholder="Dirección, distrito y referencia" />
           </Field>
+          <input style={{ marginTop: 8 }} value={f.maps_url} onChange={(e) => onMapsUrl(e.target.value)} placeholder="Enlace de Google Maps (opcional)" aria-label="Enlace de Google Maps" />
           <div className="row gap wrap" style={{ marginTop: 8 }}>
             <button type="button" className="btn small" onClick={() => setShowMap(!showMap)}>{showMap ? 'Ocultar mapa' : '📍 Marcar en el mapa'}</button>
             {dest && <span className="small ok-text">Punto marcado ✓</span>}
@@ -80,10 +75,6 @@ export function OrderForm({ session, order, drivers, onClose, onSaved }: {
           </div>
           {showMap && <div style={{ marginTop: 8 }}><PickMap value={dest} onChange={setDest} /><p className="muted small">Toca el mapa o arrastra la casita.</p></div>}
         </div>
-
-        <h3 className="full">Pedido y pago</h3>
-        <div className="full"><Field label="Detalle del pedido"><textarea rows={3} value={f.items} onChange={set('items')} placeholder="1 pollo a la brasa, 1 gaseosa 1.5L…" /></Field></div>
-        <Field label="Total (S/)"><input value={f.amount} onChange={set('amount')} inputMode="decimal" placeholder="0.00" /></Field>
         <div className="full">
           <span className="field-label">Forma de pago</span>
           <div className="chips" role="radiogroup" aria-label="Forma de pago">
@@ -94,20 +85,6 @@ export function OrderForm({ session, order, drivers, onClose, onSaved }: {
             ))}
           </div>
         </div>
-        {f.payment === 'efectivo' && (
-          <Field label="Paga con (S/)" hint={payWith > amount ? `Vuelto: ${money(payWith - amount)}` : 'Déjalo vacío si paga exacto'}>
-            <input value={f.pay_with} onChange={set('pay_with')} inputMode="decimal" placeholder="Ej. 100" />
-          </Field>
-        )}
-
-        <h3 className="full">Reparto</h3>
-        <Field label="Motorizado">
-          <select value={f.driver_id} onChange={set('driver_id')}>
-            <option value="">— Sin asignar —</option>
-            {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </Field>
-        <div className="full"><Field label="Nota para el motorizado"><textarea rows={2} value={f.notes} onChange={set('notes')} placeholder="Llamar al llegar, edificio sin ascensor…" /></Field></div>
       </div>
     </Modal>
   );

@@ -26,13 +26,16 @@ export const money = (n: number | null | undefined) => `S/ ${(Number(n) || 0).to
 
 /** Texto de cobro para el motorizado (incluye el vuelto). */
 export function chargeText(o: Pick<Order, 'payment' | 'amount' | 'pay_with'>): string {
+  const amt = Number(o.amount) > 0 ? ` ${money(o.amount)}` : '';
   if (o.payment === 'pagado') return 'Ya pagó · no cobrar';
   if (o.payment === 'efectivo') {
-    if (o.pay_with && o.pay_with > o.amount) return `Cobrar ${money(o.amount)} en efectivo · paga con ${money(o.pay_with)} · llevar vuelto ${money(o.pay_with - o.amount)}`;
-    return `Cobrar ${money(o.amount)} en efectivo (monto exacto)`;
+    if (amt && o.pay_with && o.pay_with > o.amount) return `Cobrar${amt} en efectivo · paga con ${money(o.pay_with)} · llevar vuelto ${money(o.pay_with - o.amount)}`;
+    return `Cobrar${amt} en efectivo`;
   }
-  return `Cobrar ${money(o.amount)} con ${PAYMENT_LABEL[o.payment]}`;
+  return `Cobrar${amt} con ${PAYMENT_LABEL[o.payment]}`;
 }
+/** Forma de pago con el monto solo si se registró. */
+export const payLabel = (o: Pick<Order, 'payment' | 'amount'>) => `${PAYMENT_LABEL[o.payment]}${Number(o.amount) > 0 ? ` · ${money(o.amount)}` : ''}`;
 
 export const time = (iso?: string | null) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '';
 export const minutesAgo = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -89,7 +92,7 @@ export function customerMessage(o: Order, business: string): string {
   const name = o.customer_name.split(' ')[0];
   const no = ` #${orderNo(o)}`;
   const body: Record<Status, string> = {
-    confirmado: `Confirmamos tu pedido${no} por ${money(o.amount)} (${PAYMENT_LABEL[o.payment]}).`,
+    confirmado: `Confirmamos tu pedido${no} (pago: ${payLabel(o)}).`,
     preparacion: `Tu pedido${no} ya se está preparando.`,
     despacho: `Tu pedido${no} está listo y lo estamos despachando.`,
     ruta: `Tu pedido${no} va en camino${o.driver_name ? ` con ${o.driver_name.split(' ')[0]}` : ''}. Puedes ver al motorizado en el mapa.`,

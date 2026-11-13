@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { BUSINESS, BUSINESS_WHATSAPP } from '../config';
 import { usePoll } from '../hooks';
-import { PAYMENT_LABEL, STEPS, distanceKm, money, orderNo, pad, stepIndex, time, waLink } from '../lib';
+import { payLabel, STEPS, distanceKm, money, orderNo, pad, stepIndex, time, waLink } from '../lib';
 import { LiveMap, type MapPoint } from '../components/Map';
 import logo from '../assets/logo.webp';
 
@@ -91,7 +91,7 @@ export function Track({ code }: { code: string }) {
             <div className="card small">
               <div className="row between"><span className="muted">N° de ticket</span><b>{orderNo(s)}</b></div>
               <div className="row between"><span className="muted">Entrega en</span><span className="right">{s.address}</span></div>
-              <div className="row between"><span className="muted">Pago</span><span>{PAYMENT_LABEL[s.payment]} · {money(s.amount)}</span></div>
+              <div className="row between"><span className="muted">Pago</span><span>{payLabel(s)}</span></div>
             </div>
 
             {s.status !== 'entregado' && s.status !== 'anulado' && (
