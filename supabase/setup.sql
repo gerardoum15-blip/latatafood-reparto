@@ -306,9 +306,30 @@ end $$;
 create or replace function public.rep_track(p_code text) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare o public.rep_orders; v_loc jsonb := null; v_driver text;
+  v_ahead integer := 0; v_avg numeric; v_n integer; v_elapsed numeric; v_eta integer := null;
 begin
   select * into o from public.rep_orders where code = p_code;
   if not found then return null; end if;
+
+  -- Tiempo aproximado según la demanda del momento:
+  --   promedio real (confirmado → entregado) de los últimos 30 pedidos entregados en 7 días
+  --   (si hay menos de 3, se usan 35 min) + 4 min por cada pedido que está antes en la cola.
+  if o.status in ('confirmado', 'preparacion', 'despacho', 'ruta') then
+    select count(*) into v_ahead from public.rep_orders x
+    where x.status in ('confirmado', 'preparacion', 'despacho')
+      and x.created_at < o.created_at and x.created_at > now() - interval '12 hours' and x.id <> o.id;
+    select avg(m), count(*) into v_avg, v_n from (
+      select extract(epoch from ((times ->> 'entregado')::timestamptz - (times ->> 'confirmado')::timestamptz)) / 60 as m
+      from public.rep_orders
+      where status = 'entregado' and times ? 'entregado' and times ? 'confirmado' and updated_at > now() - interval '7 days'
+      order by updated_at desc limit 30) t
+    where m between 5 and 180;
+    if coalesce(v_n, 0) < 3 then v_avg := 35; end if;
+    v_avg := least(greatest(v_avg, 15), 120);
+    v_elapsed := extract(epoch from (now() - coalesce((o.times ->> 'confirmado')::timestamptz, o.created_at))) / 60;
+    if o.status = 'ruta' then v_ahead := 0; end if;
+    v_eta := greatest(case when o.status = 'ruta' then 3 else 5 end, round(v_avg + v_ahead * 4 - v_elapsed))::integer;
+  end if;
   select split_part(name, ' ', 1) into v_driver from public.rep_staff where id = o.driver_id;
   if o.status = 'ruta' then
     select jsonb_build_object('lat', lat, 'lng', lng, 'heading', heading, 'updated_at', updated_at) into v_loc
@@ -326,6 +347,8 @@ begin
     'amount', o.amount,
     'driver', v_driver,
     'location', v_loc,
+    'ahead', v_ahead,
+    'eta_min', v_eta,
     'updated_at', o.updated_at
   );
 end $$;

@@ -129,6 +129,12 @@ export async function demoRpc(fn: string, a: Record<string, unknown>): Promise<u
           dest: o.dest_lat != null && o.dest_lng != null ? { lat: o.dest_lat, lng: o.dest_lng } : null,
           payment: o.payment, amount: o.amount, driver: dr ? dr.name.split(' ')[0] : null,
           location: o.status === 'ruta' && o.driver_id ? d.locations[o.driver_id] ?? null : null, updated_at: o.updated_at,
+          ...(() => {
+            if (!['confirmado', 'preparacion', 'despacho', 'ruta'].includes(o.status)) return { ahead: 0, eta_min: null };
+            const ahead = o.status === 'ruta' ? 0 : d.orders.filter((x) => ['confirmado', 'preparacion', 'despacho'].includes(x.status) && x.created_at < o.created_at).length;
+            const elapsed = (Date.now() - +new Date(o.times.confirmado ?? o.created_at)) / 60000;
+            return { ahead, eta_min: Math.max(o.status === 'ruta' ? 3 : 5, Math.round(35 + ahead * 4 - elapsed)) };
+          })(),
         };
       }
       case 'rep_find': {

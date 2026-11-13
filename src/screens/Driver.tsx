@@ -13,7 +13,10 @@ export function Driver({ session, onOut }: { session: Session; onOut: () => void
   const guard = useSessionGuard(onOut);
   const orders = usePoll(() => guard(api.listOrders(session.token)), 6000, [session.token]);
   const list = orders.data ?? [];
-  const active = list.filter((o) => !['entregado', 'anulado'].includes(o.status));
+  // Ordenados: primero el que va en ruta, luego los listos para recoger, y del más antiguo al más nuevo.
+  const RANK: Record<string, number> = { ruta: 0, despacho: 1, preparacion: 2, confirmado: 3 };
+  const active = list.filter((o) => !['entregado', 'anulado'].includes(o.status))
+    .sort((a, b) => RANK[a.status] - RANK[b.status] || a.created_at.localeCompare(b.created_at));
   const done = list.filter((o) => o.status === 'entregado');
   const onRoute = active.some((o) => o.status === 'ruta' || o.status === 'despacho');
 
@@ -55,7 +58,7 @@ export function Driver({ session, onOut }: { session: Session; onOut: () => void
         {!orders.loaded && <p className="muted">Cargando…</p>}
         {orders.loaded && !active.length && <div className="empty">No tienes pedidos asignados. Te avisaremos con un sonido cuando llegue uno.</div>}
         <div className="cards">
-          {active.map((o) => <DriverCard key={o.id} o={o} onStatus={(s) => setStatus(o, s)} />)}
+          {active.map((o, i) => <DriverCard key={o.id} pos={i + 1} o={o} onStatus={(s) => setStatus(o, s)} />)}
         </div>
         {done.length > 0 && (
           <details className="card done-list">
@@ -63,7 +66,7 @@ export function Driver({ session, onOut }: { session: Session; onOut: () => void
             <ul className="plain">
               {done.map((o) => (
                 <li key={o.id} className="row between small">
-                  <span>#{orderNo(o)} {o.customer_name}</span>
+                  <span>#{orderNo(o)} {o.customer_name || o.customer_phone}</span>
                   <span>{payLabel(o)} · {time(o.times.entregado)}</span>
                 </li>
               ))}
@@ -75,7 +78,7 @@ export function Driver({ session, onOut }: { session: Session; onOut: () => void
   );
 }
 
-function DriverCard({ o, onStatus }: { o: Order; onStatus: (s: Status) => void }) {
+function DriverCard({ o, pos, onStatus }: { o: Order; pos: number; onStatus: (s: Status) => void }) {
   const hasDest = o.dest_lat != null && o.dest_lng != null;
   const action: { s: Status; label: string } | null =
     o.status === 'confirmado' || o.status === 'preparacion' ? { s: 'despacho', label: '📦 Recogí el pedido' }
@@ -84,12 +87,12 @@ function DriverCard({ o, onStatus }: { o: Order; onStatus: (s: Status) => void }
   return (
     <article className={`card order driver st-${o.status}`}>
       <header className="row between">
-        <div className="row gap"><b className="num">#{orderNo(o)}</b><Badge status={o.status} /></div>
+        <div className="row gap"><span className="pos">{pos}º</span><b className="num">#{orderNo(o)}</b><Badge status={o.status} /></div>
         <span className="muted small">{time(o.created_at)}</span>
       </header>
 
       <section>
-        <p className="big">{o.customer_name}</p>
+        <p className="big">{o.customer_name || 'Cliente'}</p>
         <div className="row gap">
           <a className="btn wa grow" href={waLink(o.customer_phone)} target="_blank" rel="noreferrer">WhatsApp</a>
           <a className="btn grow" href={telLink(o.customer_phone)}>📞 Llamar</a>
@@ -98,7 +101,7 @@ function DriverCard({ o, onStatus }: { o: Order; onStatus: (s: Status) => void }
       </section>
 
       <section>
-        <p>📍 <b>{o.address}</b></p>
+        <p>📍 <b>{o.address || 'Ubicación enviada por el cliente'}</b></p>
         {o.reference && <p className="small">Ref.: {o.reference}</p>}
         <div className="row gap">
           <a className="btn maps grow" href={mapsLink(o)} target="_blank" rel="noreferrer">Google Maps</a>

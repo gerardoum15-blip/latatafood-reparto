@@ -34,6 +34,9 @@ export function Track({ code }: { code: string }) {
     return p;
   }, [s]);
   const km = s?.location && s.dest ? distanceKm(s.location, s.dest) : null;
+  // En ruta con GPS: el tiempo sale de la distancia (≈ 20 km/h en moto por la ciudad + 2 min para entregar).
+  const eta = s?.status === 'ruta' && km != null ? Math.max(1, Math.ceil(km / 20 * 60) + 2) : s?.eta_min ?? null;
+  const etaClock = eta != null ? new Date(Date.now() + eta * 60000).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '';
   const locAge = s?.location ? Math.max(0, Math.round((Date.now() - new Date(s.location.updated_at).getTime()) / 1000)) : null;
 
   return (
@@ -52,13 +55,19 @@ export function Track({ code }: { code: string }) {
         {Boolean(t.error) && !s && <div className="card center"><p className="err-text">No hay conexión. Reintentando…</p></div>}
         {s && (
           <>
-            <h1 className="track-title">{s.first_name ? `Hola ${s.first_name}, ` : ''}este es tu pedido <span className="nowrap">#{orderNo(s)}</span></h1>
+            <h1 className="track-title">{s.first_name ? `Hola ${s.first_name}, este es tu pedido` : 'Este es tu pedido'} <span className="nowrap">#{orderNo(s)}</span></h1>
             {news && <div className="track-news" role="alert">🔔 Tu pedido cambió: <b>{news}</b></div>}
 
             {s.status === 'anulado' ? (
               <div className="card"><p className="err-text"><b>Este pedido fue anulado.</b></p><p className="small">Si tienes dudas, escríbenos.</p></div>
             ) : (
               <>
+                {eta != null && (
+                  <div className="card eta" role="status">
+                    <div className="eta-main">⏱ Llega en aprox. <b>{eta} min</b></div>
+                    <div className="small muted">Hora estimada ≈ {etaClock}{s.ahead > 0 ? ` · hay ${s.ahead} pedido${s.ahead > 1 ? 's' : ''} antes que el tuyo` : s.status !== 'ruta' ? ' · eres el siguiente en la cola' : ''}</div>
+                  </div>
+                )}
                 {s.status === 'ruta' && (
                   <div className="card track-live">
                     <div className="row between wrap">
@@ -90,7 +99,7 @@ export function Track({ code }: { code: string }) {
 
             <div className="card small">
               <div className="row between"><span className="muted">N° de ticket</span><b>{orderNo(s)}</b></div>
-              <div className="row between"><span className="muted">Entrega en</span><span className="right">{s.address}</span></div>
+              <div className="row between"><span className="muted">Entrega en</span><span className="right">{s.address || 'Tu ubicación enviada'}</span></div>
               <div className="row between"><span className="muted">Pago</span><span>{payLabel(s)}</span></div>
             </div>
 

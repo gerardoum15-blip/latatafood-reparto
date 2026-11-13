@@ -48,5 +48,9 @@ export interface Tracking {
   amount: number;
   driver: string | null;
   location: { lat: number; lng: number; heading: number | null; updated_at: string } | null;
+  /** Pedidos antes del suyo en la cola. */
+  ahead: number;
+  /** Minutos aproximados para que llegue (null si ya se entregó o se anuló). */
+  eta_min: number | null;
   updated_at: string;
 }

@@ -99,8 +99,8 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
                 <span className="muted small nowrap">{time(o.created_at)} · {minutesAgo(o.created_at)} min</span>
               </header>
               <div className="order-body">
-                <p><b>{o.customer_name}</b> · <a href={waLink(o.customer_phone)} target="_blank" rel="noreferrer">{o.customer_phone}</a></p>
-                <p className="muted small">📍 {o.address}{o.reference ? ` · ${o.reference}` : ''}</p>
+                <p><b>{o.customer_name || 'Cliente'}</b> · <a href={waLink(o.customer_phone)} target="_blank" rel="noreferrer">{o.customer_phone}</a></p>
+                <p className="muted small">📍 {o.address || 'Ubicación por Google Maps'}{o.maps_url ? <> · <a href={o.maps_url} target="_blank" rel="noreferrer">ver mapa</a></> : ''}</p>
                 {o.items && <p className="small pre">{o.items}</p>}
                 <p className="small charge">{chargeText(o)}</p>
               </div>

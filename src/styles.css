@@ -215,3 +215,12 @@ a { color: inherit; }
 .queue-box.st-ruta { background: var(--brand-soft); color: var(--brand); }
 .queue-box.st-entregado { background: var(--ok-soft); color: var(--ok); }
 .queue-box.on { border-color: currentColor; }
+
+/* Llenado automático */
+.import-box { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--brand-soft); border: 1px dashed var(--brand); }
+.import-box textarea { background: #fff; }
+.found { color: var(--ok); font-weight: 600; }
+.eta { background: var(--text); color: #fff; border: 0; }
+.eta .muted { color: #d6d3d3; }
+.eta-main { font-size: 1.2rem; }
+.pos { background: var(--text); color: #fff; border-radius: 8px; padding: 2px 8px; font-weight: 800; font-size: 0.9rem; }
