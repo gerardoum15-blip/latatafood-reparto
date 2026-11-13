@@ -3,7 +3,7 @@ import { api } from '../api';
 import { BUSINESS } from '../config';
 import { useGps, usePoll, useWakeLock, type GpsState } from '../hooks';
 import type { Order, Session, Status } from '../types';
-import { PAYMENT_ICON, PAYMENT_LABEL, STATUS_LABEL, chargeText, customerMessage, mapsLink, money, pad, telLink, time, waLink, wazeLink } from '../lib';
+import { PAYMENT_ICON, PAYMENT_LABEL, STATUS_LABEL, chargeText, customerMessage, mapsLink, money, orderNo, pad, telLink, time, waLink, wazeLink } from '../lib';
 import { Badge, errMsg, toast } from '../components/ui';
 import { TopBar, useSessionGuard } from './shared';
 
@@ -35,11 +35,11 @@ export function Driver({ session, onOut }: { session: Session; onOut: () => void
   }, [orders.data]);
 
   const setStatus = async (o: Order, s: Status) => {
-    if (s === 'entregado' && !confirm(`¿Entregaste el pedido #${pad(o.number)}?\n${chargeText(o)}`)) return;
+    if (s === 'entregado' && !confirm(`¿Entregaste el pedido #${orderNo(o)}?\n${chargeText(o)}`)) return;
     try {
       const upd = await guard(api.setStatus(session.token, o.id, s));
       await orders.refresh();
-      toast(`#${pad(o.number)} → ${STATUS_LABEL[s]}`);
+      toast(`#${orderNo(o)} → ${STATUS_LABEL[s]}`);
       if (s === 'ruta') setTimeout(() => { if (confirm('¿Avisar al cliente por WhatsApp que vas en camino?')) window.open(waLink(o.customer_phone, customerMessage(upd, BUSINESS)), '_blank'); }, 100);
     } catch (e) { toast(errMsg(e), 'err'); }
   };
@@ -63,7 +63,7 @@ export function Driver({ session, onOut }: { session: Session; onOut: () => void
             <ul className="plain">
               {done.map((o) => (
                 <li key={o.id} className="row between small">
-                  <span>#{pad(o.number)} {o.customer_name}</span>
+                  <span>#{orderNo(o)} {o.customer_name}</span>
                   <span>{PAYMENT_LABEL[o.payment]} {money(o.amount)} · {time(o.times.entregado)}</span>
                 </li>
               ))}
@@ -84,7 +84,7 @@ function DriverCard({ o, onStatus }: { o: Order; onStatus: (s: Status) => void }
   return (
     <article className={`card order driver st-${o.status}`}>
       <header className="row between">
-        <div className="row gap"><b className="num">#{pad(o.number)}</b><Badge status={o.status} /></div>
+        <div className="row gap"><b className="num">#{orderNo(o)}</b><Badge status={o.status} /></div>
         <span className="muted small">{time(o.created_at)}</span>
       </header>
 
@@ -120,7 +120,7 @@ function DriverCard({ o, onStatus }: { o: Order; onStatus: (s: Status) => void }
       {(o.status === 'confirmado' || o.status === 'preparacion') && <p className="muted small">La cocina aún lo está preparando.</p>}
       {action && <button className={`btn block ${action.s === 'entregado' ? 'ok' : 'primary'} big-btn`} onClick={() => onStatus(action.s)}>{action.label}</button>}
       {o.status === 'ruta' && (
-        <a className="btn block small" href={waLink(o.customer_phone, `Hola ${o.customer_name.split(' ')[0]}, soy el motorizado de ${BUSINESS}. Ya estoy en tu dirección con tu pedido #${pad(o.number)}.`)} target="_blank" rel="noreferrer">Avisar “ya llegué” por WhatsApp</a>
+        <a className="btn block small" href={waLink(o.customer_phone, `Hola ${o.customer_name.split(' ')[0]}, soy el motorizado de ${BUSINESS}. Ya estoy en tu dirección con tu pedido #${orderNo(o)}.`)} target="_blank" rel="noreferrer">Avisar “ya llegué” por WhatsApp</a>
       )}
     </article>
   );

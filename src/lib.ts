@@ -37,6 +37,8 @@ export function chargeText(o: Pick<Order, 'payment' | 'amount' | 'pay_with'>): s
 export const time = (iso?: string | null) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '';
 export const minutesAgo = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 export const pad = (n: number) => String(n).padStart(3, '0');
+/** Número que se muestra: el N° de ticket si se escribió, si no el número automático. */
+export const orderNo = (o: { ticket?: string; number: number }) => o.ticket?.trim() || pad(o.number);
 
 /** Número peruano a formato internacional sin "+" (ej. 51987654321). */
 export function normalizePhone(raw: string): string {
@@ -80,11 +82,12 @@ export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; ln
 }
 
 export const trackUrl = (code: string) => `${location.origin}${location.pathname}#seguir/${code}`;
+export const findUrl = () => `${location.origin}${location.pathname}#rastrear`;
 
 /** Mensaje de WhatsApp para el cliente según el estado. */
 export function customerMessage(o: Order, business: string): string {
   const name = o.customer_name.split(' ')[0];
-  const no = ` #${pad(o.number)}`;
+  const no = ` #${orderNo(o)}`;
   const body: Record<Status, string> = {
     confirmado: `Confirmamos tu pedido${no} por ${money(o.amount)} (${PAYMENT_LABEL[o.payment]}).`,
     preparacion: `Tu pedido${no} ya se está preparando.`,
@@ -93,6 +96,6 @@ export function customerMessage(o: Order, business: string): string {
     entregado: `Tu pedido${no} fue entregado. ¡Gracias por tu compra, que lo disfrutes!`,
     anulado: `Tu pedido${no} fue anulado. Escríbenos si tienes alguna duda.`,
   };
-  const follow = o.status === 'entregado' || o.status === 'anulado' ? '' : `\n\nSigue tu pedido en vivo aquí: ${trackUrl(o.code)}`;
+  const follow = o.status === 'entregado' || o.status === 'anulado' ? '' : `\n\nSigue tu pedido en vivo aquí: ${trackUrl(o.code)}\n(o entra a ${findUrl()} con tu N° de ticket ${orderNo(o)} y los últimos 4 dígitos de tu celular)`;
   return `Hola${name ? ` ${name}` : ''}, te escribe ${business}.\n${body[o.status]}${follow}`;
 }

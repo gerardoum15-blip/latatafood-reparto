@@ -4,6 +4,7 @@ import { BUSINESS } from '../config';
 import type { Session } from '../types';
 import { errMsg } from '../components/ui';
 import logo from '../assets/logo.webp';
+import { FindForm } from './Track';
 
 export function Login({ onIn }: { onIn: (s: Session) => void }) {
   const [setup, setSetup] = useState<boolean | null>(null);
@@ -11,7 +12,6 @@ export function Login({ onIn }: { onIn: (s: Session) => void }) {
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const [track, setTrack] = useState('');
 
   useEffect(() => { api.needsSetup().then(setSetup).catch((e) => { setSetup(false); setErr(errMsg(e)); }); }, []);
 
@@ -23,11 +23,6 @@ export function Login({ onIn }: { onIn: (s: Session) => void }) {
     finally { setBusy(false); }
   };
 
-  const goTrack = (e: React.FormEvent) => {
-    e.preventDefault();
-    const c = track.trim().split(/[#/]/).pop() ?? '';
-    if (c) location.hash = `seguir/${c}`;
-  };
 
   return (
     <div className="center-page">
@@ -53,14 +48,7 @@ export function Login({ onIn }: { onIn: (s: Session) => void }) {
         <button className="btn primary block" disabled={busy || setup === null || pin.length < 4}>{busy ? 'Ingresando…' : setup ? 'Crear y entrar' : 'Entrar'}</button>
       </form>
 
-      <form className="card stack" onSubmit={goTrack}>
-        <h2>¿Eres cliente?</h2>
-        <p className="muted small">Abre el enlace que te enviamos por WhatsApp, o pega aquí tu código de seguimiento.</p>
-        <div className="row gap">
-          <input placeholder="Código o enlace" value={track} onChange={(e) => setTrack(e.target.value)} aria-label="Código de seguimiento" />
-          <button className="btn" disabled={!track.trim()}>Ver</button>
-        </div>
-      </form>
+      <FindForm />
     </div>
   );
 }

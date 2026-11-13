@@ -10,6 +10,7 @@ export interface Order {
   id: string;
   code: string;
   number: number;
+  ticket: string;
   status: Status;
   customer_name: string;
   customer_phone: string;
@@ -37,6 +38,7 @@ export interface DriverLoc { staff_id: string; name: string; lat: number; lng: n
 
 export interface Tracking {
   number: number;
+  ticket: string;
   status: Status;
   times: Partial<Record<Status, string>>;
   first_name: string;

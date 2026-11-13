@@ -3,7 +3,7 @@ import { api } from '../api';
 import { BUSINESS } from '../config';
 import { usePoll } from '../hooks';
 import type { Order, Session, Staff, Status } from '../types';
-import { STATUS_LABEL, STEPS, chargeText, customerMessage, minutesAgo, nextStatus, pad, time, trackUrl, waLink } from '../lib';
+import { STATUS_LABEL, STEPS, chargeText, customerMessage, minutesAgo, nextStatus, orderNo, pad, time, trackUrl, waLink } from '../lib';
 import { Badge, Modal, copy, errMsg, toast } from '../components/ui';
 import { LiveMap, type MapPoint } from '../components/Map';
 import { OrderForm } from './OrderForm';
@@ -48,7 +48,7 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
   const list = orders.filter((o) => filter === 'todos' || (filter === 'activos' ? ACTIVE.includes(o.status) : !ACTIVE.includes(o.status)));
 
   const setStatus = async (o: Order, s: Status) => {
-    try { await api.setStatus(session.token, o.id, s); await refresh(); toast(`#${pad(o.number)} → ${STATUS_LABEL[s]}`); }
+    try { await api.setStatus(session.token, o.id, s); await refresh(); toast(`#${orderNo(o)} → ${STATUS_LABEL[s]}`); }
     catch (e) { toast(errMsg(e), 'err'); }
   };
   const assign = async (o: Order, driver_id: string) => {
@@ -56,7 +56,7 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
     catch (e) { toast(errMsg(e), 'err'); }
   };
   const remove = async (o: Order) => {
-    if (!confirm(`¿Borrar el pedido #${pad(o.number)}? Esto no se puede deshacer.`)) return;
+    if (!confirm(`¿Borrar el pedido #${orderNo(o)}? Esto no se puede deshacer.`)) return;
     try { await api.deleteOrder(session.token, o.id); await refresh(); } catch (e) { toast(errMsg(e), 'err'); }
   };
 
@@ -79,7 +79,7 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
           return (
             <article key={o.id} className={`card order st-${o.status}`}>
               <header className="row between">
-                <div className="row gap"><b className="num">#{pad(o.number)}</b><Badge status={o.status} /></div>
+                <div className="row gap"><b className="num">#{orderNo(o)}</b><Badge status={o.status} /></div>
                 <span className="muted small nowrap">{time(o.created_at)} · {minutesAgo(o.created_at)} min</span>
               </header>
               <div className="order-body">
@@ -119,7 +119,7 @@ function Orders({ session, orders, loaded, error, drivers, refresh }: {
         />
       )}
       {created && (
-        <Modal title={`Pedido #${pad(created.number)} creado`} onClose={() => setCreated(null)}
+        <Modal title={`Pedido #${orderNo(created)} creado`} onClose={() => setCreated(null)}
           footer={<button className="btn block" onClick={() => setCreated(null)}>Listo</button>}>
           <p>Envía al cliente su enlace de seguimiento. Lo puede abrir cuando quiera, sin instalar nada.</p>
           <p className="link-box">{trackUrl(created.code)}</p>
@@ -147,7 +147,7 @@ function DriversMap({ session, orders, guard }: { session: Session; orders: Orde
   const locs = usePoll(() => guard(api.driverLocations(session.token)), 5000, [session.token]);
   const points = useMemo<MapPoint[]>(() => {
     const pts: MapPoint[] = (locs.data ?? []).map((l) => ({ id: l.staff_id, lat: l.lat, lng: l.lng, label: `${l.name.split(' ')[0]} · ${minutesAgo(l.updated_at)}m`, kind: 'driver', stale: minutesAgo(l.updated_at) > 3 }));
-    for (const o of orders) if (o.status === 'ruta' && o.dest_lat != null && o.dest_lng != null) pts.push({ id: o.id, lat: o.dest_lat, lng: o.dest_lng, label: `#${pad(o.number)}`, kind: 'home' });
+    for (const o of orders) if (o.status === 'ruta' && o.dest_lat != null && o.dest_lng != null) pts.push({ id: o.id, lat: o.dest_lat, lng: o.dest_lng, label: `#${orderNo(o)}`, kind: 'home' });
     return pts;
   }, [locs.data, orders]);
   return (

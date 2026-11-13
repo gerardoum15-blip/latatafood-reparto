@@ -57,7 +57,14 @@ create table if not exists public.rep_orders (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- N° de ticket (el que aparece arriba en el ticket impreso). Si queda vacío se usa el número automático.
+alter table public.rep_orders add column if not exists ticket text not null default '';
 create index if not exists rep_orders_created on public.rep_orders (created_at desc);
+create index if not exists rep_orders_ticket on public.rep_orders (ticket);
+
+create table if not exists public.rep_track_fails (
+  at timestamptz not null default now()
+);
 create index if not exists rep_orders_driver on public.rep_orders (driver_id, status);
 
 create table if not exists public.rep_locations (
@@ -76,6 +83,7 @@ alter table public.rep_sessions enable row level security;
 alter table public.rep_login_fails enable row level security;
 alter table public.rep_orders enable row level security;
 alter table public.rep_locations enable row level security;
+alter table public.rep_track_fails enable row level security;
 
 -- ---------- Ayudas internas ----------
 
@@ -223,6 +231,7 @@ begin
     returning id into v_id;
   end if;
   update public.rep_orders set
+    ticket = trim(coalesce(p ->> 'ticket', '')),
     customer_name = coalesce(p ->> 'customer_name', ''),
     customer_phone = coalesce(p ->> 'customer_phone', ''),
     address = coalesce(p ->> 'address', ''),
@@ -307,6 +316,7 @@ begin
   end if;
   return jsonb_build_object(
     'number', o.number,
+    'ticket', o.ticket,
     'status', o.status,
     'times', o.times,
     'first_name', split_part(o.customer_name, ' ', 1),
@@ -318,6 +328,32 @@ begin
     'location', v_loc,
     'updated_at', o.updated_at
   );
+end $$;
+
+-- El cliente busca su pedido con el N° de ticket + los últimos 4 dígitos de su celular.
+-- Devuelve el código secreto del seguimiento (o un error). Así nadie puede ver pedidos ajenos
+-- solo probando números de ticket. Máximo 60 intentos fallidos cada 15 minutos.
+create or replace function public.rep_find(p_ticket text, p_phone4 text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_t text := ltrim(regexp_replace(coalesce(p_ticket, ''), '[^0-9A-Za-z-]', '', 'g'), '0'); v_code text;
+begin
+  delete from public.rep_track_fails where at < now() - interval '15 minutes';
+  if (select count(*) from public.rep_track_fails) >= 60 then
+    return jsonb_build_object('error', 'Demasiados intentos. Espera unos minutos.');
+  end if;
+  if v_t = '' or coalesce(p_phone4, '') !~ '^[0-9]{4}$' then
+    return jsonb_build_object('error', 'Escribe el N° de ticket y los últimos 4 dígitos de tu celular.');
+  end if;
+  select code into v_code from public.rep_orders
+  where created_at > now() - interval '3 days'
+    and (ltrim(ticket, '0') = v_t or (ticket = '' and number::text = v_t))
+    and right(regexp_replace(customer_phone, '[^0-9]', '', 'g'), 4) = p_phone4
+  order by created_at desc limit 1;
+  if v_code is null then
+    insert into public.rep_track_fails default values;
+    return jsonb_build_object('error', 'No encontramos un pedido con esos datos. Revisa el N° de ticket y tu celular.');
+  end if;
+  return jsonb_build_object('code', v_code);
 end $$;
 
 -- ---------- Permisos ----------
@@ -338,5 +374,6 @@ grant execute on function public.rep_delete_order(text, uuid) to anon, authentic
 grant execute on function public.rep_update_location(text, double precision, double precision, double precision, double precision, double precision) to anon, authenticated;
 grant execute on function public.rep_driver_locations(text) to anon, authenticated;
 grant execute on function public.rep_track(text) to anon, authenticated;
+grant execute on function public.rep_find(text, text) to anon, authenticated;
 
 notify pgrst, 'reload schema';

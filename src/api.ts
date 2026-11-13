@@ -55,4 +55,10 @@ export const api = {
   }),
   driverLocations: (token: string) => rpc<DriverLoc[]>('rep_driver_locations', { p_token: token }),
   track: (code: string) => rpc<Tracking | null>('rep_track', { p_code: code }),
+  /** El cliente busca su pedido con el N° de ticket + últimos 4 dígitos de su celular. Devuelve el código de seguimiento. */
+  find: async (ticket: string, phone4: string) => {
+    const r = await rpc<{ code?: string; error?: string }>('rep_find', { p_ticket: ticket, p_phone4: phone4 });
+    if (!r.code) throw new Error(r.error ?? 'No encontramos el pedido.');
+    return r.code;
+  },
 };

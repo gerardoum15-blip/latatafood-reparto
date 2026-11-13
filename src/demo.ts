@@ -91,7 +91,7 @@ export async function demoRpc(fn: string, a: Record<string, unknown>): Promise<u
           d.orders.push(o);
         }
         Object.assign(o, {
-          customer_name: p.customer_name ?? '', customer_phone: p.customer_phone ?? '', address: p.address ?? '',
+          ticket: (p.ticket ?? '').trim(), customer_name: p.customer_name ?? '', customer_phone: p.customer_phone ?? '', address: p.address ?? '',
           reference: p.reference ?? '', maps_url: p.maps_url ?? '', dest_lat: p.dest_lat ?? null, dest_lng: p.dest_lng ?? null,
           payment: p.payment ?? 'efectivo', amount: Number(p.amount) || 0, pay_with: p.pay_with ? Number(p.pay_with) : null,
           items: p.items ?? '', notes: p.notes ?? '', driver_id: p.driver_id || null, updated_at: now(),
@@ -125,11 +125,16 @@ export async function demoRpc(fn: string, a: Record<string, unknown>): Promise<u
         if (!o) return null;
         const dr = d.staff.find((s) => s.id === o.driver_id);
         return {
-          number: o.number, status: o.status, times: o.times, first_name: o.customer_name.split(' ')[0], address: o.address,
+          number: o.number, ticket: o.ticket ?? '', status: o.status, times: o.times, first_name: o.customer_name.split(' ')[0], address: o.address,
           dest: o.dest_lat != null && o.dest_lng != null ? { lat: o.dest_lat, lng: o.dest_lng } : null,
           payment: o.payment, amount: o.amount, driver: dr ? dr.name.split(' ')[0] : null,
           location: o.status === 'ruta' && o.driver_id ? d.locations[o.driver_id] ?? null : null, updated_at: o.updated_at,
         };
+      }
+      case 'rep_find': {
+        const t = String(a.p_ticket ?? '').replace(/[^0-9A-Za-z-]/g, '').replace(/^0+/, '');
+        const o = [...d.orders].reverse().find((x) => ((x.ticket ?? '').replace(/^0+/, '') === t || (!x.ticket && String(x.number) === t)) && x.customer_phone.replace(/\D/g, '').slice(-4) === a.p_phone4);
+        return o ? { code: o.code } : { error: 'No encontramos un pedido con esos datos. Revisa el N° de ticket y tu celular.' };
       }
     }
     throw new Error(`Función desconocida ${fn}`);

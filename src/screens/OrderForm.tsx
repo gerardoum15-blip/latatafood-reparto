@@ -11,7 +11,7 @@ export function OrderForm({ session, order, drivers, onClose, onSaved }: {
   session: Session; order: Order | null; drivers: Staff[]; onClose: () => void; onSaved: (o: Order, isNew: boolean) => void;
 }) {
   const [f, setF] = useState({
-    customer_name: order?.customer_name ?? '', customer_phone: order?.customer_phone ?? '',
+    ticket: order?.ticket ?? '', customer_name: order?.customer_name ?? '', customer_phone: order?.customer_phone ?? '',
     address: order?.address ?? '', reference: order?.reference ?? '', maps_url: order?.maps_url ?? '',
     items: order?.items ?? '', notes: order?.notes ?? '', payment: order?.payment ?? 'efectivo' as Payment,
     amount: order ? String(order.amount) : '', pay_with: order?.pay_with ? String(order.pay_with) : '',
@@ -34,6 +34,7 @@ export function OrderForm({ session, order, drivers, onClose, onSaved }: {
 
   const save = async () => {
     setErr('');
+    if (!f.ticket.trim()) return setErr('Escribe el N° de ticket.');
     if (!f.customer_name.trim()) return setErr('Escribe el nombre del cliente.');
     if (f.customer_phone.replace(/\D/g, '').length < 9) return setErr('Escribe el WhatsApp del cliente (9 dígitos).');
     if (!f.address.trim()) return setErr('Escribe la dirección.');
@@ -58,6 +59,11 @@ export function OrderForm({ session, order, drivers, onClose, onSaved }: {
       </>}
     >
       <div className="form-grid">
+        <div className="full">
+          <Field label="N° de ticket" hint="El número que aparece arriba en el ticket. El cliente lo usa, junto con los últimos 4 dígitos de su celular, para ver su pedido.">
+            <input value={f.ticket} onChange={set('ticket')} placeholder="Ej. 0458" autoComplete="off" autoFocus={!order} />
+          </Field>
+        </div>
         <h3 className="full">Cliente</h3>
         <Field label="Nombre"><input value={f.customer_name} onChange={set('customer_name')} autoComplete="off" /></Field>
         <Field label="WhatsApp"><input value={f.customer_phone} onChange={set('customer_phone')} inputMode="tel" placeholder="987 654 321" autoComplete="off" /></Field>
