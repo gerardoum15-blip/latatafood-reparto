@@ -1,0 +1,419 @@
+<title>Ordena tus Fotos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* Layout: una columna tipo app de bolsillo — cabecera con resumen, pestañas, cuadrícula de miniaturas y barra de acciones fija abajo */
+:root{
+  --bg:#f3f5fa; --surface:#ffffff; --fg:#141a2b; --muted:#5d6680; --line:#dde2ee;
+  --accent:#2f5bea; --accent-ink:#ffffff; --accent-soft:#e3e9fd;
+  --del:#d93a3a; --del-soft:#fde6e6; --keep:#178a52; --keep-soft:#dff3e8;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"Figtree", -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1220; --surface:#171c2e; --fg:#e8ebf5; --muted:#99a2bd; --line:#2a3149;
+  --accent:#7d9bff; --accent-ink:#0e1220; --accent-soft:#232c4f;
+  --del:#ff6b6b; --del-soft:#3d1d24; --keep:#4fd08f; --keep-soft:#173327; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1220; --surface:#171c2e; --fg:#e8ebf5; --muted:#99a2bd; --line:#2a3149;
+  --accent:#7d9bff; --accent-ink:#0e1220; --accent-soft:#232c4f;
+  --del:#ff6b6b; --del-soft:#3d1d24; --keep:#4fd08f; --keep-soft:#173327; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--body);-webkit-tap-highlight-color:transparent}
+.wrap{max-width:980px;margin:0 auto;padding-block:16px 120px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:1.9rem;font-weight:800;letter-spacing:-.02em}
+h2{font-size:1.15rem;font-weight:600}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.top p{margin:4px 0 0;color:var(--muted);max-width:52ch}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button,.btn{font:600 14px var(--body);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:10px;padding:10px 14px;cursor:pointer;min-height:42px}
+button:focus-visible,.btn:focus-within,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.danger{color:var(--del);border-color:var(--del)}
+.ghost{background:transparent}
+button:disabled{opacity:.5;cursor:default}
+.btn input{position:absolute;opacity:0;width:1px;height:1px}
+.btn{position:relative;display:inline-flex;align-items:center}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:16px 0}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.stat b{display:block;font:800 1.4rem var(--display);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+@media (max-width:520px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.note{background:var(--accent-soft);border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:14px}
+.progress{height:8px;border-radius:8px;background:var(--line);overflow:hidden;margin:8px 0}
+.progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:4px 0 14px;scrollbar-width:none}
+.tabs button{white-space:nowrap;border-radius:999px;padding:8px 14px;min-height:38px}
+.tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tabs em{font-style:normal;opacity:.7;margin-left:4px;font-variant-numeric:tabular-nums}
+.group{margin:0 0 22px}
+.ghead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;flex-wrap:wrap}
+.ghead small{color:var(--muted);font-variant-numeric:tabular-nums}
+.ghead .btns button{min-height:34px;padding:6px 10px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:4px}
+.ph{position:relative;padding:0;border:0;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--line);min-height:0}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph.sel{outline:3px solid var(--accent);outline-offset:-3px}
+.ph.sel::after{content:"✓";position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 13px/22px var(--body)}
+.ph.del img{opacity:.35}
+.ph.del::before{content:"Borrar";position:absolute;left:4px;bottom:4px;background:var(--del);color:#fff;font:700 10px/1 var(--body);padding:4px 6px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em}
+.ph .tag{position:absolute;left:4px;top:4px;background:var(--keep);color:#fff;font:700 10px/1 var(--body);padding:4px 6px;border-radius:5px}
+.ph .alb{position:absolute;right:4px;bottom:4px;max-width:calc(100% - 8px);background:rgba(0,0,0,.6);color:#fff;font:600 10px/1 var(--body);padding:3px 5px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.empty{color:var(--muted);padding:28px 0;text-align:center}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:20;box-shadow:0 -6px 24px rgba(0,0,0,.08)}
+.bar .in{max-width:980px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bar strong{margin-right:auto}
+select,input[type="text"]{font:500 14px var(--body);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:10px;padding:9px 10px;min-height:42px;max-width:100%}
+.review{display:grid;gap:12px;justify-items:center}
+.card{width:min(100%,520px);aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:var(--surface);border:1px solid var(--line);position:relative;touch-action:pan-y;transition:transform .18s}
+.card img{width:100%;height:100%;object-fit:contain;background:#000}
+.card .meta{position:absolute;left:0;right:0;bottom:0;padding:10px 12px;background:linear-gradient(transparent,rgba(0,0,0,.7));color:#fff;font-size:13px}
+.rbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:min(100%,520px)}
+.rbtns button{min-height:56px;font-size:16px}
+.rkeep{background:var(--keep-soft);color:var(--keep);border-color:var(--keep)}
+.rdel{background:var(--del-soft);color:var(--del);border-color:var(--del)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:min(100%,520px)}
+.chips button{min-height:34px;padding:6px 10px;font-size:13px;border-radius:999px}
+.chips button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 16px;display:grid;gap:10px}
+.panel label{display:flex;gap:8px;align-items:center}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:30;font-weight:600;max-width:90vw}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Ordena tus Fotos</h1>
+      <p>Agrupa por mes, encuentra duplicados y capturas de pantalla, decide qué borrar y guarda todo ordenado en carpetas.</p>
+    </div>
+    <div class="btns">
+      <label class="btn primary" for="pick">Elegir fotos<input id="pick" type="file" accept="image/*" multiple></label>
+      <button id="exportBtn">Exportar ordenadas</button>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+  <div id="notice"></div>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div id="view"></div>
+</div>
+<div class="bar" id="bar" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const S = { photos: [], tab: 'fechas', sel: new Set(), albums: [], sample: true, busy: null, reviewUrl: null, exportBy: 'album', exclDel: true, lastReview: [] };
+let nextId = 1;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const monthFmt = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' });
+const dayFmt = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric' });
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const monthKey = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+const monthLabel = d => cap(monthFmt.format(d));
+const fmtSize = b => b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.round(b / 1e3) + ' KB';
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2600); }
+
+/* ---------- EXIF (JPEG): fecha original y cámara ---------- */
+function readExif(buf) {
+  const v = new DataView(buf); const out = {};
+  if (v.byteLength < 4 || v.getUint16(0) !== 0xFFD8) return out;
+  let o = 2;
+  while (o + 4 < v.byteLength) {
+    const m = v.getUint16(o); const len = v.getUint16(o + 2);
+    if (m === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) {
+      const t = o + 10; const le = v.getUint16(t) === 0x4949;
+      const u16 = p => v.getUint16(p, le), u32 = p => v.getUint32(p, le);
+      const str = (p, n) => { let s = ''; for (let i = 0; i < n && p + i < v.byteLength; i++) { const c = v.getUint8(p + i); if (!c) break; s += String.fromCharCode(c); } return s; };
+      const ifd = (start, want) => {
+        const res = {}; if (start + 2 > v.byteLength) return res;
+        const n = u16(start);
+        for (let i = 0; i < n; i++) {
+          const e = start + 2 + i * 12; if (e + 12 > v.byteLength) break;
+          const tag = u16(e), cnt = u32(e + 4);
+          if (!want.includes(tag)) continue;
+          if (tag === 0x8769) res[tag] = u32(e + 8);
+          else res[tag] = str(cnt > 4 ? t + u32(e + 8) : e + 8, cnt);
+        }
+        return res;
+      };
+      try {
+        const i0 = ifd(t + u32(t + 4), [0x010F, 0x0110, 0x0132, 0x8769]);
+        out.make = i0[0x010F]; out.model = i0[0x0110]; out.date = i0[0x0132];
+        if (i0[0x8769]) { const ex = ifd(t + i0[0x8769], [0x9003]); if (ex[0x9003]) out.date = ex[0x9003]; }
+      } catch (e) {}
+      return out;
+    }
+    if ((m & 0xFF00) !== 0xFF00) break;
+    o += 2 + len;
+  }
+  return out;
+}
+function parseExifDate(s) {
+  const m = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(s || '');
+  if (!m || m[1] === '0000') return null;
+  const d = new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+  return isNaN(d) ? null : d;
+}
+
+/* ---------- Miniatura + huella visual (dHash 64 bits) ---------- */
+function loadImg(url) { return new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = url; }); }
+const pc = x => { x -= x >>> 1 & 0x55555555; x = (x & 0x33333333) + (x >>> 2 & 0x33333333); return ((x + (x >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24; };
+async function analyze(file) {
+  const p = { id: nextId++, file, name: file.name || ('foto-' + nextId + '.jpg'), size: file.size, type: file.type, del: false, album: null, reviewed: false };
+  let ex = {};
+  try { ex = readExif(await file.slice(0, 256 * 1024).arrayBuffer()); } catch (e) {}
+  p.make = ex.make || ''; p.model = ex.model || '';
+  p.date = parseExifDate(ex.date) || new Date(file.lastModified || Date.now());
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImg(url);
+    p.w = img.naturalWidth; p.h = img.naturalHeight;
+    const sc = Math.min(1, 260 / Math.max(p.w, p.h));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(p.w * sc)); c.height = Math.max(1, Math.round(p.h * sc));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    p.thumb = await new Promise(r => c.toBlob(b => r(URL.createObjectURL(b)), 'image/jpeg', .72));
+    const h = document.createElement('canvas'); h.width = 9; h.height = 8;
+    const hx = h.getContext('2d', { willReadFrequently: true }); hx.drawImage(img, 0, 0, 9, 8);
+    const d = hx.getImageData(0, 0, 9, 8).data; const g = [];
+    for (let i = 0; i < 72; i++) g.push(d[i * 4] * .299 + d[i * 4 + 1] * .587 + d[i * 4 + 2] * .114);
+    let a = 0, b = 0, k = 0;
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++, k++) { const bit = g[y * 9 + x] > g[y * 9 + x + 1] ? 1 : 0; if (k < 32) a = (a << 1 | bit) >>> 0; else b = (b << 1 | bit) >>> 0; }
+    p.hash = [a, b];
+  } catch (e) { p.w = p.h = 0; p.thumb = ''; p.hash = null; }
+  URL.revokeObjectURL(url);
+  const ratio = p.w && p.h ? Math.max(p.w, p.h) / Math.min(p.w, p.h) : 0;
+  const n = p.name.toLowerCase();
+  p.screenshot = !p.make && (/screenshot|captura|screen shot/.test(n) || p.type === 'image/png' || (ratio > 2.0 && ratio < 2.3 && p.h > p.w));
+  return p;
+}
+
+/* ---------- Duplicados y similares ---------- */
+let dupGroups = [];
+function computeDups() {
+  const ps = S.photos.filter(p => p.hash); const parent = new Map(ps.map(p => [p.id, p.id]));
+  const find = x => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+  for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
+    const A = ps[i].hash, B = ps[j].hash;
+    if (pc(A[0] ^ B[0]) + pc(A[1] ^ B[1]) <= 6) { const ra = find(ps[i].id), rb = find(ps[j].id); if (ra !== rb) parent.set(ra, rb); }
+  }
+  const m = new Map(); ps.forEach(p => { const r = find(p.id); if (!m.has(r)) m.set(r, []); m.get(r).push(p); });
+  dupGroups = [...m.values()].filter(g => g.length > 1).map(g => g.sort((a, b) => (b.w * b.h - a.w * a.h) || (b.size - a.size)));
+}
+
+/* ---------- Cargar fotos ---------- */
+async function addFiles(files, isSample) {
+  files = [...files].filter(f => f.type.startsWith('image/') || /\.(heic|heif|jpe?g|png|gif|webp)$/i.test(f.name));
+  if (!files.length) return;
+  if (!isSample && S.sample) { S.photos.forEach(p => p.thumb && URL.revokeObjectURL(p.thumb)); S.photos = []; S.albums = []; S.sel.clear(); S.sample = false; }
+  S.busy = { done: 0, total: files.length }; renderNotice();
+  const queue = files.slice(); const out = [];
+  const worker = async () => { while (queue.length) { const f = queue.shift(); out.push(await analyze(f)); S.busy.done++; if (S.busy.done % 4 === 0) renderNotice(); } };
+  await Promise.all([worker(), worker(), worker()]);
+  S.photos.push(...out); S.photos.sort((a, b) => b.date - a.date);
+  S.busy = null; computeDups(); render();
+  if (!isSample) toast(out.length + ' fotos cargadas');
+}
+$('#pick').addEventListener('change', e => { addFiles(e.target.files, false); e.target.value = ''; });
+
+/* ---------- Acciones ---------- */
+const byId = id => S.photos.find(p => p.id === id);
+function setDel(ids, v) { ids.forEach(id => { const p = byId(id); if (p) p.del = v; }); }
+function setAlbum(ids, a) { ids.forEach(id => { const p = byId(id); if (p) p.album = a; }); }
+function addAlbum(name) { name = name.trim().replace(/[\\/:*?"<>|]/g, '-'); if (!name) return null; if (!S.albums.includes(name)) S.albums.push(name); return name; }
+
+/* ---------- Render ---------- */
+function tile(p, extra = '') {
+  return `<button class="ph${S.sel.has(p.id) ? ' sel' : ''}${p.del ? ' del' : ''}" data-id="${p.id}" aria-label="${esc(p.name)}, ${esc(dayFmt.format(p.date))}${p.del ? ', marcada para borrar' : ''}">${p.thumb ? `<img src="${p.thumb}" alt="" loading="lazy">` : ''}${extra}${p.album ? `<span class="alb">${esc(p.album)}</span>` : ''}</button>`;
+}
+function renderStats() {
+  const ps = S.photos, dupExtra = dupGroups.reduce((n, g) => n + g.length - 1, 0);
+  const st = [[ps.length, 'Fotos'], [ps.filter(p => p.del).length, 'Para borrar'], [dupExtra, 'Copias'], [ps.filter(p => p.screenshot).length, 'Capturas']];
+  $('#stats').innerHTML = st.map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
+}
+function renderNotice() {
+  let h = '';
+  if (S.busy) h = `<div class="note">Analizando fotos… ${S.busy.done} de ${S.busy.total}<div class="progress"><i style="width:${(S.busy.done / S.busy.total * 100).toFixed(1)}%"></i></div></div>`;
+  else if (S.sample) h = `<div class="note"><b>Estas son fotos de ejemplo.</b> Toca «Elegir fotos» para cargar las tuyas desde la galería del iPhone. Puedes elegir muchas a la vez; tus fotos no salen de tu teléfono.</div>`;
+  $('#notice').innerHTML = h;
+}
+const TABS = [['fechas', 'Por fecha'], ['revisar', 'Revisar una a una'], ['dups', 'Duplicados'], ['capturas', 'Capturas'], ['albumes', 'Álbumes'], ['borrar', 'Para borrar']];
+function renderTabs() {
+  const cnt = { dups: dupGroups.length, capturas: S.photos.filter(p => p.screenshot).length, albumes: S.albums.length, borrar: S.photos.filter(p => p.del).length, revisar: S.photos.filter(p => !p.reviewed).length, fechas: S.photos.length };
+  $('#tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${S.tab === k}">${l}<em>${cnt[k]}</em></button>`).join('');
+}
+function groupHead(title, sub, ids, extraBtns = '') {
+  return `<div class="ghead"><div><h2>${esc(title)}</h2><small>${sub}</small></div><div class="btns">${extraBtns}<button data-selall="${ids.join(',')}">Seleccionar</button></div></div>`;
+}
+function renderView() {
+  const v = $('#view'); const ps = S.photos;
+  if (S.tab !== 'revisar' && S.reviewUrl) { URL.revokeObjectURL(S.reviewUrl); S.reviewUrl = null; }
+  if (!ps.length) { v.innerHTML = '<p class="empty">Todavía no hay fotos. Toca «Elegir fotos» para empezar.</p>'; return; }
+  if (S.tab === 'fechas') {
+    const groups = new Map(); ps.forEach(p => { const k = monthKey(p.date); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); });
+    v.innerHTML = [...groups.values()].map(g => `<section class="group">${groupHead(monthLabel(g[0].date), g.length + ' fotos', g.map(p => p.id))}<div class="grid">${g.map(p => tile(p)).join('')}</div></section>`).join('');
+  } else if (S.tab === 'dups') {
+    if (!dupGroups.length) { v.innerHTML = '<p class="empty">No encontré fotos repetidas ni casi iguales.</p>'; return; }
+    const extra = dupGroups.reduce((n, g) => n + g.length - 1, 0);
+    v.innerHTML = `<div class="panel"><div>Encontré <b>${dupGroups.length}</b> grupos de fotos iguales o muy parecidas. En cada grupo dejo como <b>Mejor</b> la de mayor resolución.</div><div class="row"><button class="danger" data-act="markAllDups">Marcar ${extra} copias para borrar</button></div></div>` +
+      dupGroups.map((g, i) => `<section class="group">${groupHead('Grupo ' + (i + 1), g.length + ' fotos · ' + esc(dayFmt.format(g[0].date)), g.map(p => p.id), `<button data-dupmark="${i}">Marcar copias</button>`)}<div class="grid">${g.map((p, j) => tile(p, j === 0 ? '<span class="tag">Mejor</span>' : '')).join('')}</div></section>`).join('');
+  } else if (S.tab === 'capturas') {
+    const c = ps.filter(p => p.screenshot);
+    v.innerHTML = c.length ? `<section class="group">${groupHead('Capturas de pantalla', c.length + ' fotos', c.map(p => p.id), `<button class="danger" data-markids="${c.map(p => p.id).join(',')}">Marcar todas para borrar</button>`)}<div class="grid">${c.map(p => tile(p)).join('')}</div></section>` : '<p class="empty">No encontré capturas de pantalla.</p>';
+  } else if (S.tab === 'borrar') {
+    const d = ps.filter(p => p.del);
+    v.innerHTML = d.length ? `<div class="panel"><div>Estas fotos no se incluirán al exportar. Para quitarlas también de tu iPhone, búscalas en la app Fotos (abajo verás nombre y fecha) y bórralas allí.</div><div class="row"><button data-act="undelAll">Quitar todas las marcas</button></div></div><div class="grid">${d.map(p => tile(p)).join('')}</div><div class="panel" style="margin-top:16px"><h2>Lista</h2><div style="font-size:13px;color:var(--muted)">${d.map(p => esc(p.name) + ' — ' + esc(dayFmt.format(p.date))).join('<br>')}</div></div>` : '<p class="empty">No hay fotos marcadas para borrar.</p>';
+  } else if (S.tab === 'albumes') {
+    v.innerHTML = `<div class="panel"><h2>Crear álbum</h2><form class="row" id="albForm"><input type="text" id="albName" placeholder="Ej.: Vacaciones, Familia, Trabajo" aria-label="Nombre del álbum"><button class="primary" type="submit">Crear</button></form><div style="color:var(--muted);font-size:13px">Después selecciona fotos en cualquier pestaña y usa «Mover a álbum» en la barra de abajo. Al exportar, cada álbum será una carpeta.</div></div>` +
+      (S.albums.length ? S.albums.map(a => { const g = ps.filter(p => p.album === a); return `<section class="group">${groupHead(a, g.length + ' fotos', g.map(p => p.id), `<button data-delalb="${esc(a)}">Eliminar álbum</button>`)}<div class="grid">${g.map(p => tile(p)).join('') || '<span class="empty">Vacío</span>'}</div></section>`; }).join('') : '<p class="empty">Aún no tienes álbumes.</p>');
+  } else if (S.tab === 'revisar') {
+    const p = ps.find(x => !x.reviewed);
+    if (!p) { v.innerHTML = `<div class="panel"><h2>¡Revisaste todas!</h2><div>Conservadas: ${ps.filter(x => !x.del).length} · Para borrar: ${ps.filter(x => x.del).length}</div><div class="row"><button data-act="resetReview">Volver a revisar</button>${S.lastReview.length ? '<button data-act="undoReview">Deshacer la última</button>' : ''}</div></div>`; return; }
+    if (S.reviewUrl) URL.revokeObjectURL(S.reviewUrl);
+    S.reviewUrl = URL.createObjectURL(p.file);
+    const left = ps.filter(x => !x.reviewed).length;
+    v.innerHTML = `<div class="review"><div style="color:var(--muted)">Faltan <b>${left}</b> de ${ps.length} · desliza a la izquierda para borrar, a la derecha para conservar</div>
+      <div class="card" id="card" data-id="${p.id}"><img src="${S.reviewUrl}" alt="${esc(p.name)}"><div class="meta">${esc(dayFmt.format(p.date))} · ${p.w}×${p.h} · ${fmtSize(p.size)}${p.screenshot ? ' · Captura' : ''}</div></div>
+      <div class="rbtns"><button class="rdel" data-rev="del">✕ Borrar</button><button class="rkeep" data-rev="keep">✓ Conservar</button></div>
+      ${S.albums.length ? `<div class="chips">${S.albums.map(a => `<button data-revalb="${esc(a)}" class="${p.album === a ? 'on' : ''}">${esc(a)}</button>`).join('')}</div>` : '<div style="color:var(--muted);font-size:13px">Crea álbumes en la pestaña «Álbumes» para clasificar mientras revisas.</div>'}
+      ${S.lastReview.length ? '<button class="ghost" data-act="undoReview">↶ Deshacer</button>' : ''}</div>`;
+    bindSwipe();
+  }
+}
+function renderBar() {
+  const b = $('#bar'); const n = S.sel.size;
+  if (S.exporting) return;
+  if (!n) { b.hidden = true; return; }
+  b.hidden = false;
+  b.innerHTML = `<div class="in"><strong>${n} seleccionada${n > 1 ? 's' : ''}</strong>
+    <button class="danger" data-act="markSel">Borrar</button><button data-act="unmarkSel">Conservar</button>
+    <select id="moveSel" aria-label="Mover a álbum"><option value="">Mover a álbum…</option>${S.albums.map(a => `<option>${esc(a)}</option>`).join('')}<option value="__new">+ Álbum nuevo</option><option value="__none">Quitar de álbum</option></select>
+    <input type="text" id="newAlb" placeholder="Nombre del álbum" hidden aria-label="Nombre del álbum nuevo"><button data-act="newAlbOk" id="newAlbOk" hidden class="primary">Crear y mover</button>
+    <button class="ghost" data-act="clearSel">Cancelar</button></div>`;
+}
+function render() { renderStats(); renderNotice(); renderTabs(); renderView(); renderBar(); }
+
+/* ---------- Eventos ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.tab) { S.tab = t.dataset.tab; S.sel.clear(); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.id && t.classList.contains('ph')) { const id = +t.dataset.id; S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); t.classList.toggle('sel'); renderBar(); return; }
+  if (t.dataset.selall !== undefined) { const ids = t.dataset.selall.split(',').filter(Boolean).map(Number); const all = ids.every(i => S.sel.has(i)); ids.forEach(i => all ? S.sel.delete(i) : S.sel.add(i)); renderView(); renderBar(); return; }
+  if (t.dataset.dupmark !== undefined) { setDel(dupGroups[+t.dataset.dupmark].slice(1).map(p => p.id), true); render(); return; }
+  if (t.dataset.markids) { setDel(t.dataset.markids.split(',').map(Number), true); render(); toast('Marcadas para borrar'); return; }
+  if (t.dataset.delalb) { const a = t.dataset.delalb; S.albums = S.albums.filter(x => x !== a); S.photos.forEach(p => { if (p.album === a) p.album = null; }); render(); return; }
+  if (t.dataset.rev) { const id = +$('#card').dataset.id; review(id, t.dataset.rev === 'del'); return; }
+  if (t.dataset.revalb) { const p = byId(+$('#card').dataset.id); p.album = p.album === t.dataset.revalb ? null : t.dataset.revalb; renderView(); return; }
+  const a = t.dataset.act; if (!a) return;
+  const sel = [...S.sel];
+  if (a === 'markSel') { setDel(sel, true); S.sel.clear(); render(); toast('Marcadas para borrar'); }
+  else if (a === 'unmarkSel') { setDel(sel, false); S.sel.clear(); render(); }
+  else if (a === 'clearSel') { S.sel.clear(); renderView(); renderBar(); }
+  else if (a === 'newAlbOk') { const n = addAlbum($('#newAlb').value); if (!n) return; setAlbum(sel, n); S.sel.clear(); render(); toast('Movidas a «' + n + '»'); }
+  else if (a === 'markAllDups') { dupGroups.forEach(g => setDel(g.slice(1).map(p => p.id), true)); render(); toast('Copias marcadas para borrar'); }
+  else if (a === 'undelAll') { S.photos.forEach(p => p.del = false); render(); }
+  else if (a === 'resetReview') { S.photos.forEach(p => p.reviewed = false); S.lastReview = []; render(); }
+  else if (a === 'undoReview') { const r = S.lastReview.pop(); if (r) { const p = byId(r.id); p.reviewed = false; p.del = r.del; } render(); }
+  else if (a === 'doExport') doExport();
+  else if (a === 'closeExport') { S.exporting = false; $('#bar').hidden = true; renderBar(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'moveSel') {
+    const v = e.target.value; const sel = [...S.sel];
+    if (v === '__new') { $('#newAlb').hidden = false; $('#newAlbOk').hidden = false; $('#newAlb').focus(); return; }
+    if (v === '__none') { setAlbum(sel, null); } else if (v) { setAlbum(sel, v); toast('Movidas a «' + v + '»'); }
+    S.sel.clear(); render();
+  }
+  if (e.target.name === 'expBy') S.exportBy = e.target.value;
+  if (e.target.id === 'exclDel') S.exclDel = e.target.checked;
+});
+document.addEventListener('submit', e => { if (e.target.id === 'albForm') { e.preventDefault(); const n = addAlbum($('#albName').value); if (n) { render(); toast('Álbum «' + n + '» creado'); } } });
+document.addEventListener('keydown', e => {
+  if (S.tab !== 'revisar' || !$('#card') || /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  if (e.key === 'ArrowLeft') review(+$('#card').dataset.id, true);
+  if (e.key === 'ArrowRight') review(+$('#card').dataset.id, false);
+});
+function review(id, del) { const p = byId(id); S.lastReview.push({ id, del: p.del }); p.del = del; p.reviewed = true; render(); }
+function bindSwipe() {
+  const c = $('#card'); if (!c) return; let x0 = null, dx = 0;
+  c.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; dx = 0; c.style.transition = 'none'; }, { passive: true });
+  c.addEventListener('touchmove', e => { if (x0 === null) return; dx = e.touches[0].clientX - x0; c.style.transform = `translateX(${dx}px) rotate(${dx / 30}deg)`; c.style.outline = Math.abs(dx) > 60 ? `4px solid ${dx < 0 ? 'var(--del)' : 'var(--keep)'}` : ''; }, { passive: true });
+  c.addEventListener('touchend', () => { c.style.transition = ''; if (Math.abs(dx) > 90) review(+c.dataset.id, dx < 0); else { c.style.transform = ''; c.style.outline = ''; } x0 = null; });
+}
+
+/* ---------- Exportar ---------- */
+$('#exportBtn').addEventListener('click', () => {
+  if (!S.photos.length) { toast('Primero elige tus fotos'); return; }
+  S.sel.clear(); S.exporting = true; renderView();
+  const b = $('#bar'); b.hidden = false;
+  b.innerHTML = `<div class="in" style="display:grid;gap:8px"><strong>Exportar fotos ordenadas en carpetas (.zip)</strong>
+    <label><input type="radio" name="expBy" value="album" ${S.exportBy === 'album' ? 'checked' : ''}> Por álbum (las demás, por mes)</label>
+    <label><input type="radio" name="expBy" value="mes" ${S.exportBy === 'mes' ? 'checked' : ''}> Solo por mes</label>
+    <label><input type="checkbox" id="exclDel" ${S.exclDel ? 'checked' : ''}> No incluir las marcadas para borrar</label>
+    <div id="expProg" style="color:var(--muted);font-size:13px">En el iPhone el .zip se guarda en la app Archivos; al abrirlo verás una carpeta por mes o álbum.</div>
+    <div class="row"><button class="primary" data-act="doExport">Crear .zip</button><button class="ghost" data-act="closeExport">Cerrar</button></div></div>`;
+});
+async function offerFile(name, blob) {
+  if (window.claude && window.claude.use) {
+    const d = await window.claude.use('downloads');
+    if (d) { try { await d.save({ filename: name, data: blob }); return true; } catch (e) { if (e && e.code === 'declined') return false; toast('No se pudo guardar: ' + (e && e.message || 'error')); return false; } }
+  }
+  const f = new File([blob], name, { type: blob.type || 'application/zip' });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return true; } catch (e) { if (e.name === 'AbortError') return false; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); return true;
+}
+async function doExport() {
+  if (!window.JSZip) { toast('No se pudo cargar el compresor. Revisa tu conexión.'); return; }
+  const list = S.photos.filter(p => !(S.exclDel && p.del));
+  if (!list.length) { toast('No hay fotos para exportar'); return; }
+  const zip = new JSZip(); const used = new Set();
+  list.forEach(p => {
+    const folder = (S.exportBy === 'album' && p.album) ? p.album : `${monthKey(p.date)} ${monthLabel(p.date)}`;
+    let n = p.name.replace(/[\\/:*?"<>|]/g, '-'), path = folder + '/' + n, k = 2;
+    while (used.has(path.toLowerCase())) { path = folder + '/' + n.replace(/(\.[^.]*)?$/, m => '-' + k + m); k++; }
+    used.add(path.toLowerCase());
+    zip.file(path, p.file, { date: p.date, binary: true });
+  });
+  const prog = $('#expProg');
+  try {
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, m => { prog.textContent = 'Preparando… ' + Math.round(m.percent) + '%'; });
+    prog.textContent = `Listo: ${list.length} fotos, ${fmtSize(blob.size)}.`;
+    const ok = await offerFile('Fotos ordenadas.zip', blob);
+    if (ok) toast('Archivo listo');
+  } catch (e) { prog.textContent = 'No se pudo crear el archivo. Prueba exportando menos fotos a la vez.'; }
+}
+
+/* ---------- Fotos de ejemplo ---------- */
+async function makeSample() {
+  const mk = (w, h, draw, type, q) => new Promise(r => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); c.toBlob(r, type, q); });
+  const scene = (sky1, sky2, ground, sun) => (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, sky1); g.addColorStop(1, sky2); x.fillStyle = g; x.fillRect(0, 0, w, h);
+    x.fillStyle = sun; x.beginPath(); x.arc(w * .7, h * .32, h * .12, 0, 7); x.fill();
+    x.fillStyle = ground; x.beginPath(); x.moveTo(0, h * .7); x.quadraticCurveTo(w * .3, h * .5, w * .6, h * .68); x.quadraticCurveTo(w * .85, h * .8, w, h * .62); x.lineTo(w, h); x.lineTo(0, h); x.fill();
+  };
+  const now = new Date(); const ago = (m, d) => new Date(now.getFullYear(), now.getMonth() - m, d, 12).getTime();
+  const specs = [
+    ['IMG_0412.jpg', scene('#ffb070', '#ffe2b8', '#4d6b3a', '#fff4d6'), ago(0, 3)],
+    ['IMG_0413.jpg', scene('#ffb070', '#ffe2b8', '#4d6b3a', '#fff4d6'), ago(0, 3), .5],
+    ['IMG_0398.jpg', scene('#3d7bd9', '#bfe0ff', '#c9a86a', '#ffffff'), ago(0, 1)],
+    ['IMG_0350.jpg', scene('#21304f', '#5b6fa3', '#1b2235', '#f2f0d8'), ago(1, 20)],
+    ['IMG_0351.jpg', scene('#7a4fbf', '#f2a6c9', '#2c3a52', '#ffe9f2'), ago(1, 12)],
+    ['IMG_0302.jpg', scene('#2aa69a', '#d7f5ef', '#3a5f43', '#ffffff'), ago(2, 7)],
+    ['IMG_0303.jpg', scene('#2aa69a', '#d7f5ef', '#3a5f43', '#ffffff'), ago(2, 7), .4],
+  ];
+  const files = [];
+  for (const [n, d, t, q] of specs) files.push(new File([await mk(640, 480, d, 'image/jpeg', q || .85)], n, { type: 'image/jpeg', lastModified: t }));
+  const shot = await mk(390, 844, (x, w, h) => { x.fillStyle = '#f4f4f7'; x.fillRect(0, 0, w, h); x.fillStyle = '#2f5bea'; x.fillRect(0, 0, w, 90); x.fillStyle = '#d8dbe5'; for (let i = 0; i < 7; i++) x.fillRect(20, 120 + i * 95, w - 40, 70); }, 'image/png');
+  files.push(new File([shot], 'Captura 2.png', { type: 'image/png', lastModified: ago(1, 2) }));
+  await addFiles(files, true);
+  if (S.sample) { addAlbum('Paisajes'); setAlbum(S.photos.filter(p => /0398|0302/.test(p.name)).map(p => p.id), 'Paisajes'); render(); }
+}
+render(); makeSample();
+})();
+</script>

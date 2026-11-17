@@ -1,29 +1,22 @@
-# Reparto · La Tata Food
+# Ordena tus Fotos
 
-App web pequeña para el reparto a domicilio:
+App web para iPhone que ayuda a ordenar la galería. Funciona en Safari, sin instalar nada, y las fotos no salen del teléfono (todo se procesa en el navegador).
 
-- **Administrador**: crea el pedido (cliente, WhatsApp, dirección, referencia, ubicación, detalle, total y forma de pago con vuelto), asigna el motorizado, cambia los estados y envía al cliente su enlace de seguimiento por WhatsApp. Ve a los motorizados en un mapa en vivo y gestiona el personal (cada uno con su PIN).
-- **Motorizado**: ve solo sus pedidos con nombre, botones de WhatsApp y llamada, dirección con Google Maps / Waze y cuánto cobrar (con vuelto). Maneja los estados: *Salir en camino → Marcar entregado*. Comparte su GPS automáticamente mientras reparte.
-- **Cliente**: abre su enlace (`…/#seguir/CODIGO`) sin instalar nada y ve los 5 estados y, cuando el pedido está *En ruta*, al motorizado moviéndose en el mapa y la distancia que falta. Puede cerrar la página y volver a abrir el enlace cuando quiera.
+## Qué hace
 
-Estados (los cambia el driver): Pedido confirmado y en preparación · En camino hacia tu ubicación · Pedido entregado.
+- **Por fecha:** agrupa las fotos por mes usando la fecha original de la foto (EXIF).
+- **Revisar una a una:** desliza a la izquierda para borrar y a la derecha para conservar; puedes asignar álbum mientras revisas.
+- **Duplicados:** detecta fotos iguales o casi iguales y sugiere la mejor (mayor resolución).
+- **Capturas:** encuentra capturas de pantalla para borrarlas de una vez.
+- **Álbumes:** crea álbumes y mueve fotos seleccionadas.
+- **Exportar:** crea un `.zip` con una carpeta por álbum o por mes, sin las fotos marcadas para borrar.
 
-## Puesta en marcha
+## Límites
 
-1. **Supabase**: abre tu proyecto (puede ser el mismo de La Tata Food; todas las tablas empiezan con `rep_`) → *SQL Editor* → *New query* → pega `supabase/setup.sql` → *Run*.
-2. **Configuración**: en `src/config.ts` pega `SUPABASE_URL` y `SUPABASE_KEY` (Project Settings → API → *Publishable key*) y el WhatsApp del negocio.
-3. **Publicar**: sube el repositorio a GitHub y en *Settings → Pages → Source* elige **GitHub Actions**. Cada cambio en `main` se publica solo.
-4. Abre la app: la primera vez pide crear el **administrador** (nombre + PIN). Luego en *Personal* agrega a los motorizados con su PIN.
+Una app web no puede borrar fotos ni crear álbumes dentro de la app Fotos del iPhone. La pestaña «Para borrar» muestra nombre y fecha de cada foto para borrarla a mano en Fotos.
 
-Sin el paso 2 la app funciona en **modo demo** (datos solo en ese navegador; PIN 1234 administrador, 1111 motorizado).
+## Estructura
 
-## Importante sobre el GPS del motorizado
-
-Un navegador solo puede enviar la ubicación **mientras la página está abierta en pantalla**. La app mantiene la pantalla encendida (en Chrome/Android y Safari 16.4+) y reenvía la ubicación cada pocos segundos. Si el motorizado bloquea el celular o cambia a otra app, el cliente ve la última ubicación y el aviso "Última ubicación hace X min". Para GPS con la pantalla apagada se necesitaría una app nativa (Android/iOS).
-
-## Desarrollo
-
-```bash
-npm install
-npm run dev
-```
+- `src/app.html`: la app completa (HTML, CSS y JS en un archivo).
+- `build.sh`: genera `site/index.html`.
+- `.github/workflows/pages.yml`: publica en GitHub Pages al hacer push a `main`.
