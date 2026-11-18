@@ -1,5 +1,8 @@
 const { chromium, devices } = require('playwright'); const { crearEntorno } = require('./simulador-google.js'); const path = require('path'), os = require('os'); const fs = require('fs');
-const SP = fs.mkdtempSync(path.join(os.tmpdir(), 'aula-')), HTML = 'file://' + path.join(__dirname, '../apps-script/Index.html');
+const SP = fs.mkdtempSync(path.join(os.tmpdir(), 'aula-')), HTML = 'file://' + SP_HTML();
+// Google Apps Script borra todo lo que hay entre /* y */ en el HTML (aunque esté dentro de un texto).
+// Se imita aquí para que la prueba falle si el código vuelve a tener esas secuencias dentro de textos.
+function SP_HTML() { const src = fs.readFileSync(path.join(__dirname, '../apps-script/Index.html'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); const f = path.join(SP, 'Index.html'); fs.writeFileSync(f, src); return f; }
 fs.writeFileSync(SP + '/tarea.pdf', '%PDF-1.4\n%%EOF\n'); fs.writeFileSync(SP + '/video.mp4', require('crypto').randomBytes(9 * 1024 * 1024 + 123)); fs.writeFileSync(SP + '/examen.jpg', Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==', 'base64'));
 const E = crearEntorno(path.join(__dirname, '../apps-script/Codigo.gs')); E.ctx.__instalar();
 const errs = [], log = (...a) => console.log('✓', ...a);
