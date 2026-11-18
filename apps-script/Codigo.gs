@@ -549,7 +549,7 @@ function textoDeEntrega_(e) {
   const r = json_(e.respuestas, {});
   return [e.texto || ''].concat(Object.keys(r).map(k => typeof r[k] === 'string' && r[k].length > 25 ? r[k] : '')).join('\n').trim();
 }
-function normaliza_(t) { return String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ\s]/g, ' ').split(/\s+/).filter(Boolean); }
+function normaliza_(t) { return String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9ñ\s]/g, ' ').split(/\s+/).filter(Boolean); }
 function tejas_(pal, n) { const s = {}; for (let i = 0; i + n <= pal.length; i++) s[pal.slice(i, i + n).join(' ')] = 1; return s; }
 function analizar_(tareaId, limiteIA) {
   const t = buscar_('Tareas', tareaId); if (!t) throw new Error('Tarea no encontrada.');
