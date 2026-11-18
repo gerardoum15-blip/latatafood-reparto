@@ -61,6 +61,17 @@ button:disabled{opacity:.5;cursor:default}
 .ph.del img{opacity:.35}
 .ph.del::before{content:"Borrar";position:absolute;left:4px;bottom:4px;background:var(--del);color:#fff;font:700 10px/1 var(--body);padding:4px 6px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em}
 .ph .tag{position:absolute;left:4px;top:4px;background:var(--keep);color:#fff;font:700 10px/1 var(--body);padding:4px 6px;border-radius:5px}
+.sbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--line)}
+.sbar i{display:block;height:100%}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.viewer{position:fixed;inset:0;z-index:40;background:rgba(5,8,15,.96);color:#fff;display:grid;grid-template-rows:auto 1fr auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.viewer[hidden]{display:none!important}
+.vtop,.vbot{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px max(16px,env(safe-area-inset-left,0px));font-size:13px}
+.vbot{justify-content:center}
+.vtop button,.vbot button{background:rgba(255,255,255,.12);color:#fff;border-color:transparent;min-width:48px}
+.vbot .rdel{background:var(--del);color:#fff}.vbot .rkeep{background:var(--keep);color:#fff}
+.vmid{min-height:0;display:grid;place-items:center;padding:0 8px}
+.vmid img,.vmid video{max-width:100%;max-height:100%;object-fit:contain}
 .delbtn{background:var(--del);color:#fff;border-color:var(--del)}
 .ph .vid{position:absolute;right:4px;top:4px;background:rgba(0,0,0,.65);color:#fff;font:700 10px/1 var(--body);padding:4px 6px;border-radius:5px;font-variant-numeric:tabular-nums}
 .ph.sel .vid{top:30px}
@@ -124,6 +135,7 @@ select,input[type="text"]{font:500 14px var(--body);border:1px solid var(--line)
   <div id="view"></div>
 </div>
 <div class="bar" id="bar" hidden></div>
+<div class="viewer" id="viewer" hidden role="dialog" aria-label="Vista en grande"></div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -194,6 +206,7 @@ function parseExifDate(s) {
 
 /* ---------- Miniatura + huella visual (dHash 64 bits) ---------- */
 function loadImg(url) { return new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = url; }); }
+const colClose = (a, b, t) => !a.col || !b.col || Math.abs(a.col[0] - b.col[0]) + Math.abs(a.col[1] - b.col[1]) + Math.abs(a.col[2] - b.col[2]) <= t;
 const pc = x => { x -= x >>> 1 & 0x55555555; x = (x & 0x33333333) + (x >>> 2 & 0x33333333); return ((x + (x >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24; };
 async function decodeSmall(file, exThumb) {
   // 1) miniatura que ya viene dentro de la foto (instantáneo), 2) decodificar reducido, 3) imagen completa
@@ -242,6 +255,7 @@ async function finishThumb(p, c) {
   let a = 0, b = 0, k = 0;
   for (let y = 0; y < 8; y++) for (let xx = 0; xx < 8; xx++, k++) { const bit = g[y * 9 + xx] > g[y * 9 + xx + 1] ? 1 : 0; if (k < 32) a = (a << 1 | bit) >>> 0; else b = (b << 1 | bit) >>> 0; }
   p.hash = [a, b];
+  { let r = 0, gg = 0, bb = 0; for (let i = 0; i < 72; i++) { r += d[i * 4]; gg += d[i * 4 + 1]; bb += d[i * 4 + 2]; } p.col = [r / 72, gg / 72, bb / 72]; }
   // nitidez (varianza del laplaciano) y brillo medio, como hacen las apps de limpieza
   const W = 128, H = Math.max(8, Math.round(128 * c.height / c.width)), m = document.createElement('canvas'); m.width = W; m.height = H;
   const mx = m.getContext('2d', { willReadFrequently: true }); mx.drawImage(c, 0, 0, W, H);
@@ -261,11 +275,14 @@ async function analyze(file) {
     p.w = fr.w || 0; p.h = fr.h || 0; p.dur = fr.dur && isFinite(fr.dur) ? fr.dur : 0;
     try { await finishThumb(p, fr.canvas || placeholder('▶')); p.noFrame = !fr.canvas; } catch (e) { p.thumb = ''; p.hash = null; }
     p.screenshot = false;
+    const vr = p.w && p.h ? Math.max(p.w, p.h) / Math.min(p.w, p.h) : 0;
+    p.screenrec = !p.gps && p.h > p.w && vr > 2.0 && vr < 2.3;
     return p;
   }
   let ex = {};
   try { ex = readExif(await file.slice(0, 128 * 1024).arrayBuffer()); } catch (e) {}
   p.make = ex.make || ''; p.model = ex.model || ''; p.gps = ex.gps || null;
+  p.exifDate = !!parseExifDate(ex.date);
   p.date = parseExifDate(ex.date) || new Date(file.lastModified || Date.now());
   const rot = ex.thumb && ex.orient >= 5 && ex.orient <= 8;
   try {
@@ -293,7 +310,7 @@ async function analyze(file) {
 /* ---------- Duplicados y similares ---------- */
 let dupGroups = [];
 function computeDups() {
-  const ps = S.photos.filter(p => p.hash); const parent = new Map(ps.map(p => [p.id, p.id]));
+  const ps = S.photos.filter(p => p.hash && !p.noFrame && !(p.bright < 28)); const parent = new Map(ps.map(p => [p.id, p.id]));
   const find = x => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
   // 8 bandas de 8 bits: si dos huellas difieren en 6 bits o menos, coinciden al menos en 2 bandas
   for (let band = 0; band < 8; band++) {
@@ -302,7 +319,7 @@ function computeDups() {
     buckets.forEach(l => { for (let x = 0; x < l.length; x++) for (let y = x + 1; y < l.length; y++) {
       const i = l[x], j = l[y];
       const A = ps[i].hash, B = ps[j].hash;
-      if (pc(A[0] ^ B[0]) + pc(A[1] ^ B[1]) <= 6) { const ra = find(ps[i].id), rb = find(ps[j].id); if (ra !== rb) parent.set(ra, rb); }
+      if (pc(A[0] ^ B[0]) + pc(A[1] ^ B[1]) <= 6 && colClose(ps[i], ps[j], 30) && ps[i].video === ps[j].video) { const ra = find(ps[i].id), rb = find(ps[j].id); if (ra !== rb) parent.set(ra, rb); }
     } });
   }
   const m = new Map(); ps.forEach(p => { const r = find(p.id); if (!m.has(r)) m.set(r, []); m.get(r).push(p); });
@@ -315,11 +332,11 @@ const quality = p => (p.sharp || 0) * (p.bright > 40 && p.bright < 220 ? 1 : .5)
 function computeClean() {
   const dupOf = new Map(); dupGroups.forEach((g, i) => g.forEach(p => dupOf.set(p.id, i)));
   // similares = fotos tomadas en ráfaga o casi seguidas (≤ 90 s) que se parecen; se sugiere la más nítida
-  const ph = S.photos.filter(p => !p.video && p.hash).sort((a, b) => a.date - b.date), groups = [];
+  const ph = S.photos.filter(p => !p.video && p.hash && !(p.bright < 28)).sort((a, b) => a.date - b.date), groups = [];
   let cur = null;
   ph.forEach(p => {
     const prev = cur && cur[cur.length - 1];
-    if (prev && p.date - prev.date <= 90e3 && pc(prev.hash[0] ^ p.hash[0]) + pc(prev.hash[1] ^ p.hash[1]) <= 18) cur.push(p);
+    if (prev && p.date - prev.date <= 90e3 && pc(prev.hash[0] ^ p.hash[0]) + pc(prev.hash[1] ^ p.hash[1]) <= 18 && colClose(prev, p, 45)) cur.push(p);
     else { if (cur && cur.length > 1) groups.push(cur); cur = [p]; }
   });
   if (cur && cur.length > 1) groups.push(cur);
@@ -330,7 +347,9 @@ function computeClean() {
   const vids = S.photos.filter(p => p.video);
   clean = {
     dups: dupGroups.flatMap(g => g.slice(1)), similar: simGroups.flatMap(g => g.slice(1)), blurry: S.photos.filter(p => p.blurry), dark: S.photos.filter(p => p.dark),
-    bigVideos: vids.filter(p => p.size > 100e6).sort((a, b) => b.size - a.size), shortVideos: vids.filter(p => p.dur > 0 && p.dur < 3), screenshots: S.photos.filter(p => p.screenshot)
+    bigVideos: vids.filter(p => p.size > 100e6).sort((a, b) => b.size - a.size), shortVideos: vids.filter(p => p.dur > 0 && p.dur < 3), screenshots: S.photos.filter(p => p.screenshot || p.screenrec),
+    received: S.photos.filter(p => !p.video && !p.screenshot && !p.make && (/whatsapp|-wa\d|^img-\d{8}|telegram|download|descarga/i.test(p.name) || !p.exifDate)),
+    heaviest: S.photos.slice().sort((a, b) => b.size - a.size).slice(0, 50).filter(p => p.size > 5e6)
   };
 }
 const CLEAN_INFO = {
@@ -340,7 +359,9 @@ const CLEAN_INFO = {
   dark: ['Muy oscuras', 'Fotos casi negras, por ejemplo sacadas sin querer.'],
   bigVideos: ['Videos pesados', 'Videos de más de 100 MB, los que más espacio ocupan.'],
   shortVideos: ['Videos de menos de 3 segundos', 'Suelen grabarse sin querer.'],
-  screenshots: ['Capturas de pantalla', 'Capturas que normalmente ya no se necesitan.']
+  screenshots: ['Capturas y grabaciones de pantalla', 'Capturas y grabaciones de la pantalla que normalmente ya no se necesitan.'],
+  received: ['Recibidas o descargadas', 'Imágenes que no tomó tu cámara: de WhatsApp, redes o internet (memes, cadenas, imágenes reenviadas).'],
+  heaviest: ['Los 50 más pesados', 'Los archivos que más espacio ocupan. Revisa si los necesitas.']
 };
 const fmtDur = d => { d = Math.round(d || 0); return Math.floor(d / 60) + ':' + String(d % 60).padStart(2, '0'); };
 const bytes = list => list.reduce((s, p) => s + p.size, 0);
@@ -468,6 +489,22 @@ async function autoRun() {
   if (!S.cls.error && S.cls.total) toast('Fotos ordenadas en carpetas');
 }
 
+/* ---------- Guardar avance entre sesiones ---------- */
+const fkey = p => p.name + '|' + p.size + '|' + (p.file.lastModified || 0);
+let saveT = 0, savedProg = store.get('progress', {});
+function saveProgress() {
+  if (S.sample) return; clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    const m = Object.assign({}, savedProg);
+    S.photos.forEach(p => { const v = [p.del ? 1 : 0, p.album || 0, p.cat || 0, p.subj || 0, p.reviewed ? 1 : 0]; if (v.some(Boolean)) m[fkey(p)] = v; else delete m[fkey(p)]; });
+    savedProg = m; store.set('progress', m); store.set('albums', S.albums); store.set('placeNames', S.placeNames);
+  }, 800);
+}
+function applySaved(p) {
+  const v = savedProg[fkey(p)]; if (!v) return false;
+  p.del = !!v[0]; p.album = v[1] || null; p.cat = v[2] || null; p.subj = v[3] || null; p.reviewed = !!v[4]; return true;
+}
+
 /* ---------- Asistente IA ---------- */
 S.chat = []; S.aiBusy = false; S.aiErr = null; S.undo = null; S.draft = '';
 const AI_FIRST = 'Acabo de cargar mis fotos. Míralas, dime qué encontraste y propónme cómo ordenarlas.';
@@ -584,7 +621,7 @@ async function aiSend(text, first) {
   const msg = { role: 'assistant', text: '', raw: '', acts: [], opts: [], follow: null };
   S.chat.push(msg); S.aiBusy = true; S.aiErr = null; renderChat();
   const sample = await getSample();
-  if (!sample) { S.chat.pop(); S.aiBusy = false; S.aiErr = 'El asistente funciona cuando abres esta app dentro de Claude (en la app de Claude o en claude.ai).'; renderChat(); return; }
+  if (!sample) { S.chat.pop(); S.chat.pop(); S.aiBusy = false; S.aiErr = 'El asistente funciona cuando abres esta app dentro de Claude (en la app de Claude o en claude.ai).'; renderChat(); return; }
   let caps = null; try { caps = await sample.limits(); } catch (e) {}
   const useTools = !!(caps && caps.tools), snap = snapshot(); let changed = false;
   S.aiCtrl = new AbortController();
@@ -632,6 +669,7 @@ async function addFiles(files, isSample) {
   const worker = async () => { while (queue.length) { const f = queue.shift(); out.push(await analyze(f)); S.busy.done++; const now = Date.now(); if (now - lastPaint > 200) { lastPaint = now; renderNotice(); } } };
   const nW = Math.min(8, Math.max(4, navigator.hardwareConcurrency || 4));
   await Promise.all(Array.from({ length: nW }, worker));
+  if (!isSample) { let n = 0; out.forEach(p => { if (applySaved(p)) n++; }); if (n) { S.restored = n; store.get('albums', []).forEach(a => { if (!S.albums.includes(a)) S.albums.push(a); }); out.forEach(p => { if (p.album && !S.albums.includes(p.album)) S.albums.push(p.album); }); Object.assign(S.placeNames, store.get('placeNames', {})); } }
   S.photos.push(...out); S.photos.sort((a, b) => b.date - a.date);
   S.busy = null; computeDups(); computeAuto(); computeClean(); render();
   if (!isSample) {
@@ -661,18 +699,19 @@ function capGrid(key, list, n = 60, extra) {
 }
 function renderStats() {
   const ps = S.photos, dupExtra = dupGroups.reduce((n, g) => n + g.length - 1, 0);
-  const st = [[ps.length, ps.some(p => p.video) ? 'Fotos y videos' : 'Fotos'], [ps.filter(p => p.del).length, 'Para borrar'], [dupExtra, 'Copias'], [ps.filter(p => p.screenshot).length, 'Capturas']];
+  const st = [[ps.length, ps.some(p => p.video) ? 'Fotos y videos' : 'Fotos'], [ps.filter(p => p.del).length, 'Para borrar'], [dupExtra, 'Copias'], [fmtBig(bytes([...new Set(Object.entries(clean).filter(([k]) => k !== 'heaviest' && k !== 'received').flatMap(([, l]) => l))].filter(p => !p.del))), 'Puedes liberar']];
   $('#stats').innerHTML = st.map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
 }
 function renderNotice() {
   let h = '';
   if (S.busy) { const el = (Date.now() - (S.busy.t0 || Date.now())) / 1000, rate = el > 1 ? S.busy.done / el : 0, left = rate ? Math.ceil((S.busy.total - S.busy.done) / rate) : 0; h = `<div class="note">Analizando fotos… ${S.busy.done} de ${S.busy.total}${rate ? ` · ${Math.round(rate)} por segundo · falta${left > 90 ? 'n unos ' + Math.ceil(left / 60) + ' min' : 'n unos ' + left + ' s'}` : ''}`; h += `<div class="progress"><i style="width:${(S.busy.done / S.busy.total * 100).toFixed(1)}%"></i></div></div>`; }
-  else if (S.sample) h = `<div class="note"><b>Estas son fotos de ejemplo.</b> Toca «Elegir fotos» para cargar las tuyas desde la galería del iPhone. Puedes elegir muchas a la vez; tus fotos no salen de tu teléfono.</div>`;
+  else if (S.restored) h = `<div class="note">Recuperé lo que ya habías hecho antes con <b>${S.restored}</b> de estos archivos (eliminadas, álbumes y clasificación). <button class="ghost" data-act="forgetProg" style="min-height:32px;padding:4px 10px">Empezar de cero</button></div>`;
+  else if (S.sample) h = `<div class="note"><b>Estas son fotos de ejemplo.</b> Toca «Elegir fotos y videos» para cargar los tuyos desde tu celular, tablet o laptop. Tus archivos no se suben a ningún lado: todo se procesa en tu dispositivo.</div>`;
   $('#notice').innerHTML = h;
 }
-const TABS = [['asistente', 'Asistente IA'], ['auto', 'Carpetas automáticas'], ['fechas', 'Por fecha'], ['limpieza', 'Limpieza'], ['revisar', 'Revisar una a una'], ['albumes', 'Álbumes'], ['borrar', 'Para borrar']];
+const TABS = [['asistente', 'Asistente IA'], ['limpieza', 'Limpieza'], ['auto', 'Carpetas automáticas'], ['revisar', 'Revisar una a una'], ['fechas', 'Por fecha'], ['albumes', 'Álbumes'], ['borrar', 'Para borrar']];
 function renderTabs() {
-  const cnt = { limpieza: new Set(Object.values(clean).flat().filter(p => !p.del)).size, albumes: S.albums.length, borrar: S.photos.filter(p => p.del).length, revisar: S.photos.filter(p => !p.reviewed).length, fechas: S.photos.length, asistente: S.chat.filter(m => m.role === 'assistant').length, auto: autoFolders(S.autoView).length };
+  const cnt = { limpieza: new Set(Object.entries(clean).filter(([k]) => k !== 'heaviest' && k !== 'received').flatMap(([, l]) => l).filter(p => !p.del)).size, albumes: S.albums.length, borrar: S.photos.filter(p => p.del).length, revisar: S.photos.filter(p => !p.reviewed).length, fechas: S.photos.length, asistente: S.chat.filter(m => m.role === 'assistant').length, auto: autoFolders(S.autoView).length };
   $('#tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${S.tab === k}">${l}<em>${cnt[k]}</em></button>`).join('');
 }
 function groupHead(title, sub, ids, extraBtns = '') {
@@ -714,9 +753,10 @@ function renderView() {
     v.innerHTML = [...groups.entries()].map(([k, g]) => `<section class="group">${groupHead(monthLabel(g[0].date), g.length + ' fotos', g.map(p => p.id))}${capGrid('mes:' + k, g, 40)}</section>`).join('');
   } else if (S.tab === 'limpieza') {
     const keys = Object.keys(CLEAN_INFO), cv = S.cleanView || 'dups', list = clean[cv] || [];
-    const pending = keys.reduce((s, k) => s.concat((clean[k] || []).filter(p => !p.del)), []), uniq = [...new Set(pending)];
+    const pending = keys.filter(k => k !== 'heaviest' && k !== 'received').reduce((s, k) => s.concat((clean[k] || []).filter(p => !p.del)), []), uniq = [...new Set(pending)];
     const marked = ps.filter(p => p.del);
-    let h = `<div class="panel"><div>Puedes liberar hasta <b>${fmtBig(bytes(uniq))}</b> en ${uniq.length} archivos. Ya marcaste ${marked.length} (${fmtBig(bytes(marked))}).</div>
+    const kinds = [['Fotos', ps.filter(p => !p.video && !p.screenshot), 'var(--accent)'], ['Videos', ps.filter(p => p.video), 'var(--keep)'], ['Capturas', ps.filter(p => p.screenshot), 'var(--muted)']], totB = bytes(ps) || 1;
+    let h = `<div class="panel"><div class="sbar">${kinds.map(([, l, c]) => `<i style="width:${(bytes(l) / totB * 100).toFixed(2)}%;background:${c}"></i>`).join('')}</div><div class="row" style="font-size:13px;color:var(--muted)">${kinds.map(([n, l, c]) => `<span><span class="dot" style="background:${c}"></span>${n}: ${l.length} · ${fmtBig(bytes(l))}</span>`).join('')}</div><div>Puedes liberar hasta <b>${fmtBig(bytes(uniq))}</b> en ${uniq.length} archivos. Ya marcaste ${marked.length} (${fmtBig(bytes(marked))}).</div>
       <div class="row"><button class="delbtn" data-act="cleanAll" ${uniq.length ? '' : 'disabled'}>Eliminar todo lo sugerido</button>${S.lastClean ? `<button data-act="undoClean">Deshacer: recuperar ${S.lastClean.length}</button>` : ''}</div>
       <div style="color:var(--muted);font-size:13px">Lo eliminado no entra en tu respaldo .zip, así guardas solo lo que vale. En «Para borrar» tienes la lista para borrarlo también del iPhone.</div></div>
       <div class="cards">${keys.map(k => { const l = clean[k] || [], left = l.filter(p => !p.del); return `<button class="ccard" data-cleanview="${k}" aria-selected="${cv === k}"><span>${CLEAN_INFO[k][0]}</span><b>${left.length}</b><span>${fmtBig(bytes(left))}</span></button>`; }).join('')}</div>`;
@@ -741,12 +781,17 @@ function renderView() {
     v.innerHTML = `<div class="panel"><h2>Crear álbum</h2><form class="row" id="albForm"><input type="text" id="albName" placeholder="Ej.: Vacaciones, Familia, Trabajo" aria-label="Nombre del álbum"><button class="primary" type="submit">Crear</button></form><div style="color:var(--muted);font-size:13px">Después selecciona fotos en cualquier pestaña y usa «Mover a álbum» en la barra de abajo. Al exportar, cada álbum será una carpeta.</div></div>` +
       (S.albums.length ? S.albums.map(a => { const g = ps.filter(p => p.album === a); return `<section class="group">${groupHead(a, g.length + ' fotos', g.map(p => p.id), `<button data-delalb="${esc(a)}">Eliminar álbum</button>`)}${g.length ? capGrid('alb:' + a, g, 40) : '<span class="empty">Vacío</span>'}</section>`; }).join('') : '<p class="empty">Aún no tienes álbumes.</p>');
   } else if (S.tab === 'revisar') {
-    const p = ps.find(x => !x.reviewed);
+    const months = [...new Set(ps.map(x => monthKey(x.date)))];
+    const sug = new Set(Object.entries(clean).filter(([k]) => k !== 'heaviest').flatMap(([, l]) => l));
+    const sc = S.revScope || 'todo', pool = ps.filter(x => sc === 'todo' ? true : sc === 'sug' ? sug.has(x) : sc === 'videos' ? x.video : monthKey(x.date) === sc);
+    const scopeSel = `<label class="row" style="justify-content:center">Revisar: <select id="revScope">${[['todo', 'Todo'], ['sug', 'Solo lo sugerido para limpiar'], ['videos', 'Solo videos'], ...months.map(m => [m, monthLabel(new Date(+m.slice(0, 4), +m.slice(5) - 1, 1))])].map(([k, l]) => `<option value="${k}" ${sc === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+    const p = pool.find(x => !x.reviewed);
+    if (!p) { v.innerHTML = `${scopeSel}<div class="panel" style="margin-top:12px"><h2>¡Revisaste todo esto!</h2><div>Conservadas: ${pool.filter(x => !x.del).length} · Para borrar: ${pool.filter(x => x.del).length}</div><div class="row"><button data-act="resetReview">Volver a revisar</button>${S.lastReview.length ? '<button data-act="undoReview">Deshacer la última</button>' : ''}</div></div>`; return; }
     if (!p) { v.innerHTML = `<div class="panel"><h2>¡Revisaste todas!</h2><div>Conservadas: ${ps.filter(x => !x.del).length} · Para borrar: ${ps.filter(x => x.del).length}</div><div class="row"><button data-act="resetReview">Volver a revisar</button>${S.lastReview.length ? '<button data-act="undoReview">Deshacer la última</button>' : ''}</div></div>`; return; }
     if (S.reviewUrl) URL.revokeObjectURL(S.reviewUrl);
     S.reviewUrl = URL.createObjectURL(p.file);
-    const left = ps.filter(x => !x.reviewed).length;
-    v.innerHTML = `<div class="review"><div style="color:var(--muted)">Faltan <b>${left}</b> de ${ps.length} · desliza a la izquierda para borrar, a la derecha para conservar</div>
+    const left = pool.filter(x => !x.reviewed).length;
+    v.innerHTML = `<div class="review">${scopeSel}<div style="color:var(--muted)">Faltan <b>${left}</b> de ${pool.length} · desliza a la izquierda para borrar, a la derecha para conservar</div>
       <div class="card" id="card" data-id="${p.id}">${p.video ? `<video src="${S.reviewUrl}" controls playsinline muted style="width:100%;height:100%;object-fit:contain;background:#000"></video>` : `<img src="${S.reviewUrl}" alt="${esc(p.name)}">`}<div class="meta">${esc(dayFmt.format(p.date))} · ${p.video ? 'Video ' + fmtDur(p.dur) : p.w + '×' + p.h} · ${fmtSize(p.size)}${p.screenshot ? ' · Captura' : ''}${p.blurry ? ' · Borrosa' : ''}</div></div>
       <div class="rbtns"><button class="rdel" data-rev="del">✕ Borrar</button><button class="rkeep" data-rev="keep">✓ Conservar</button></div>
       ${S.albums.length ? `<div class="chips">${S.albums.map(a => `<button data-revalb="${esc(a)}" class="${p.album === a ? 'on' : ''}">${esc(a)}</button>`).join('')}</div>` : '<div style="color:var(--muted);font-size:13px">Crea álbumes en la pestaña «Álbumes» para clasificar mientras revisas.</div>'}
@@ -763,9 +808,22 @@ function renderBar() {
     <button class="danger" data-act="markSel">Borrar</button><button data-act="unmarkSel">Conservar</button>
     <select id="moveSel" aria-label="Mover a álbum"><option value="">Mover a álbum…</option>${S.albums.map(a => `<option>${esc(a)}</option>`).join('')}<option value="__new">+ Álbum nuevo</option><option value="__none">Quitar de álbum</option></select>
     <input type="text" id="newAlb" placeholder="Nombre del álbum" hidden aria-label="Nombre del álbum nuevo"><button data-act="newAlbOk" id="newAlbOk" hidden class="primary">Crear y mover</button>
-    <button class="ghost" data-act="clearSel">Cancelar</button></div>`;
+    <button data-act="viewSel">Ver en grande</button><button class="ghost" data-act="clearSel">Cancelar</button></div>`;
 }
-function render() { renderStats(); renderNotice(); renderTabs(); renderView(); renderBar(); }
+function openViewer(id) {
+  const order = [...document.querySelectorAll('#view .ph')].map(b => +b.dataset.id);
+  S.viewer = { order: order.includes(id) ? order : [id], i: Math.max(0, order.indexOf(id)) }; drawViewer();
+}
+function drawViewer() {
+  const vw = $('#viewer'); if (!S.viewer) { vw.hidden = true; vw.innerHTML = ''; if (S.viewUrl) { URL.revokeObjectURL(S.viewUrl); S.viewUrl = null; } return; }
+  const p = byId(S.viewer.order[S.viewer.i]); if (!p) { S.viewer = null; return drawViewer(); }
+  if (S.viewUrl) URL.revokeObjectURL(S.viewUrl); S.viewUrl = URL.createObjectURL(p.file);
+  vw.hidden = false;
+  vw.innerHTML = `<div class="vtop"><span>${S.viewer.i + 1} de ${S.viewer.order.length} · ${esc(dayFmt.format(p.date))} · ${p.video ? 'Video ' + fmtDur(p.dur) : (p.w ? p.w + '×' + p.h : '')} · ${fmtSize(p.size)}${p.gps ? ' · ' + esc(placeName(p.place)) : ''}${p.cat ? ' · ' + esc(p.cat) : ''}</span><button data-act="vClose" aria-label="Cerrar">✕</button></div>
+    <div class="vmid">${p.video ? `<video src="${S.viewUrl}" controls playsinline autoplay muted></video>` : `<img src="${S.viewUrl}" alt="${esc(p.name)}">`}</div>
+    <div class="vbot"><button data-act="vPrev" ${S.viewer.i ? '' : 'disabled'} aria-label="Anterior">‹</button>${p.del ? '<button class="rkeep" data-act="vKeep">✓ Recuperar</button>' : '<button class="rdel" data-act="vDel">✕ Eliminar</button>'}<button data-act="vNext" ${S.viewer.i < S.viewer.order.length - 1 ? '' : 'disabled'} aria-label="Siguiente">›</button></div>`;
+}
+function render() { renderStats(); renderNotice(); renderTabs(); renderView(); renderBar(); saveProgress(); }
 
 /* ---------- Eventos ---------- */
 document.addEventListener('click', e => {
@@ -796,7 +854,13 @@ document.addEventListener('click', e => {
   else if (a === 'undoReview') { const r = S.lastReview.pop(); if (r) { const p = byId(r.id); p.reviewed = false; p.del = r.del; } render(); }
   else if (a === 'doExport') doExport();
   else if (a === 'autoRun') autoRun();
-  else if (a === 'cleanAll') { const ids = [...new Set(Object.values(clean).flat().filter(p => !p.del).map(p => p.id))]; setDel(ids, true); S.lastClean = ids; render(); toast(`Eliminadas ${ids.length} del respaldo`); }
+  else if (a === 'viewSel') { const id = [...S.sel][0]; if (id) openViewer(id); }
+  else if (a === 'vClose') { S.viewer = null; drawViewer(); render(); }
+  else if (a === 'vPrev') { S.viewer.i--; drawViewer(); }
+  else if (a === 'vNext') { S.viewer.i++; drawViewer(); }
+  else if (a === 'vDel' || a === 'vKeep') { const p = byId(S.viewer.order[S.viewer.i]); p.del = a === 'vDel'; if (a === 'vDel' && S.viewer.i < S.viewer.order.length - 1) S.viewer.i++; drawViewer(); renderStats(); }
+  else if (a === 'forgetProg') { savedProg = {}; store.set('progress', {}); S.restored = 0; S.photos.forEach(p => { p.del = false; p.album = null; p.cat = null; p.subj = null; p.reviewed = false; }); S.albums = []; computeAuto(); render(); toast('Empezamos de cero'); }
+  else if (a === 'cleanAll') { const ids = [...new Set(Object.entries(clean).filter(([k]) => k !== 'heaviest' && k !== 'received').flatMap(([, l]) => l).filter(p => !p.del).map(p => p.id))]; setDel(ids, true); S.lastClean = ids; render(); toast(`Eliminadas ${ids.length} del respaldo`); }
   else if (a === 'undoClean') { setDel(S.lastClean || [], false); S.lastClean = null; render(); toast('Recuperadas'); }
   else if (a === 'aiStart') aiSend(AI_FIRST, true);
   else if (a === 'aiStop') { S.aiCtrl && S.aiCtrl.abort(); }
@@ -819,11 +883,14 @@ document.addEventListener('change', e => {
   if (e.target.id === 'catsIn') { const c = e.target.value.split(',').map(x => x.trim().replace(/[\\/:*?"<>|]/g, '-')).filter(Boolean); S.cats = c.length ? [...new Set(c)] : DEF_CATS.slice(); if (!S.cats.includes('Otros')) S.cats.push('Otros'); store.set('cats', S.cats); S.photos.forEach(p => { if (p.cat && !S.cats.includes(p.cat)) p.cat = null; }); render(); }
   if (e.target.id === 'tataIn') { S.tata = e.target.value.trim(); store.set('tata', S.tata); }
   if (e.target.id === 'exclDel') S.exclDel = e.target.checked;
+  if (e.target.id === 'revScope') { S.revScope = e.target.value; renderView(); }
   if (e.target.name === 'expBy' || e.target.id === 'exclDel') { S.expParts = null; const pr = $('#expProg'); if (pr) pr.textContent = 'Toca «Preparar .zip» de nuevo.'; }
 });
 document.addEventListener('input', e => { if (e.target.id === 'chatIn') S.draft = e.target.value; });
 document.addEventListener('submit', e => { if (e.target.id === 'chatForm') { e.preventDefault(); const t = S.draft; if (!t.trim() || S.aiBusy) return; S.draft = ''; e.target.querySelector('input').value = ''; aiSend(t); return; } if (e.target.id === 'albForm') { e.preventDefault(); const n = addAlbum($('#albName').value); if (n) { render(); toast('Álbum «' + n + '» creado'); } } });
+document.addEventListener('dblclick', e => { const t = e.target.closest('.ph'); if (t) { e.preventDefault(); openViewer(+t.dataset.id); } });
 document.addEventListener('keydown', e => {
+  if (S.viewer) { if (e.key === 'Escape') { S.viewer = null; drawViewer(); render(); } if (e.key === 'ArrowLeft' && S.viewer.i > 0) { S.viewer.i--; drawViewer(); } if (e.key === 'ArrowRight' && S.viewer.i < S.viewer.order.length - 1) { S.viewer.i++; drawViewer(); } return; }
   if (S.tab !== 'revisar' || !$('#card') || /INPUT|SELECT/.test(document.activeElement.tagName)) return;
   if (e.key === 'ArrowLeft') review(+$('#card').dataset.id, true);
   if (e.key === 'ArrowRight') review(+$('#card').dataset.id, false);
@@ -925,7 +992,8 @@ async function makeSample() {
   if (S.sample) {
     const cats = { '0412': 'Paisajes', '0413': 'Paisajes', '0398': 'Paisajes', '0350': 'Paisajes', '0351': 'Diseños', '0302': 'Comida', '0303': 'Comida' };
     S.photos.forEach(p => { const k = (p.name.match(/\d{4}/) || [])[0]; if (cats[k]) p.cat = cats[k]; if (/0412|0413|0398/.test(p.name)) p.gps = [-12.122, -77.03]; if (/0302|0303/.test(p.name)) p.gps = [-12.046, -77.043]; });
-    computeAuto(); places.forEach((c, i) => S.placeNames[c.key] = i ? 'Ejemplo: Centro' : 'Ejemplo: Playa');
+    S.photos.forEach(p => { if (!p.screenshot) { p.exifDate = true; p.make = 'Apple'; } });
+    computeAuto(); computeClean(); places.forEach((c, i) => S.placeNames[c.key] = i ? 'Ejemplo: Centro' : 'Ejemplo: Playa');
     addAlbum('Favoritas'); setAlbum(S.photos.filter(p => /0398/.test(p.name)).map(p => p.id), 'Favoritas'); render();
   }
 }
