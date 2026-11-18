@@ -89,7 +89,7 @@ select,input[type="text"]{font:500 14px var(--body);border:1px solid var(--line)
   <div class="top">
     <div>
       <h1>Ordena tus Fotos</h1>
-      <p>Agrupa por mes, encuentra duplicados y capturas de pantalla, decide qué borrar y guarda todo ordenado en carpetas.</p>
+      <p>Crea carpetas automáticas por tipo (paisajes, diseños, La Tata Food…), evento y lugar. También encuentra duplicados y capturas, y guarda todo ordenado.</p>
     </div>
     <div class="btns">
       <label class="btn primary" for="pick">Elegir fotos<input id="pick" type="file" accept="image/*" multiple></label>
@@ -108,7 +108,7 @@ select,input[type="text"]{font:500 14px var(--body);border:1px solid var(--line)
 <script>
 (() => {
 const $ = s => document.querySelector(s);
-const S = { photos: [], tab: 'fechas', sel: new Set(), albums: [], sample: true, busy: null, reviewUrl: null, exportBy: 'album', exclDel: true, lastReview: [] };
+const S = { photos: [], tab: 'auto', sel: new Set(), albums: [], sample: true, busy: null, reviewUrl: null, exportBy: 'tipo', exclDel: true, lastReview: [] };
 let nextId = 1;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const monthFmt = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' });
@@ -131,22 +131,27 @@ function readExif(buf) {
       const t = o + 10; const le = v.getUint16(t) === 0x4949;
       const u16 = p => v.getUint16(p, le), u32 = p => v.getUint32(p, le);
       const str = (p, n) => { let s = ''; for (let i = 0; i < n && p + i < v.byteLength; i++) { const c = v.getUint8(p + i); if (!c) break; s += String.fromCharCode(c); } return s; };
-      const ifd = (start, want) => {
+      const ifd = start => {
         const res = {}; if (start + 2 > v.byteLength) return res;
         const n = u16(start);
         for (let i = 0; i < n; i++) {
           const e = start + 2 + i * 12; if (e + 12 > v.byteLength) break;
-          const tag = u16(e), cnt = u32(e + 4);
-          if (!want.includes(tag)) continue;
-          if (tag === 0x8769) res[tag] = u32(e + 8);
-          else res[tag] = str(cnt > 4 ? t + u32(e + 8) : e + 8, cnt);
+          const tag = u16(e), type = u16(e + 2), cnt = u32(e + 4);
+          if (type === 2) res[tag] = str(cnt > 4 ? t + u32(e + 8) : e + 8, cnt);
+          else if (type === 4) res[tag] = u32(e + 8);
+          else if (type === 5) { const p = t + u32(e + 8), a = []; for (let k = 0; k < cnt && p + k * 8 + 8 <= v.byteLength; k++) { const d = u32(p + k * 8 + 4); a.push(d ? u32(p + k * 8) / d : 0); } res[tag] = a; }
         }
         return res;
       };
       try {
-        const i0 = ifd(t + u32(t + 4), [0x010F, 0x0110, 0x0132, 0x8769]);
+        const i0 = ifd(t + u32(t + 4));
         out.make = i0[0x010F]; out.model = i0[0x0110]; out.date = i0[0x0132];
-        if (i0[0x8769]) { const ex = ifd(t + i0[0x8769], [0x9003]); if (ex[0x9003]) out.date = ex[0x9003]; }
+        if (i0[0x8769]) { const ex = ifd(t + i0[0x8769]); if (ex[0x9003]) out.date = ex[0x9003]; }
+        if (i0[0x8825]) {
+          const g = ifd(t + i0[0x8825]); const dms = a => a && a.length === 3 ? a[0] + a[1] / 60 + a[2] / 3600 : null;
+          let lat = dms(g[2]), lon = dms(g[4]);
+          if (lat !== null && lon !== null && (lat || lon)) { if (/S/i.test(g[1] || '')) lat = -lat; if (/W/i.test(g[3] || '')) lon = -lon; out.gps = [lat, lon]; }
+        }
       } catch (e) {}
       return out;
     }
@@ -169,7 +174,7 @@ async function analyze(file) {
   const p = { id: nextId++, file, name: file.name || ('foto-' + nextId + '.jpg'), size: file.size, type: file.type, del: false, album: null, reviewed: false };
   let ex = {};
   try { ex = readExif(await file.slice(0, 256 * 1024).arrayBuffer()); } catch (e) {}
-  p.make = ex.make || ''; p.model = ex.model || '';
+  p.make = ex.make || ''; p.model = ex.model || ''; p.gps = ex.gps || null; p.cat = null;
   p.date = parseExifDate(ex.date) || new Date(file.lastModified || Date.now());
   const url = URL.createObjectURL(file);
   try {
@@ -178,7 +183,8 @@ async function analyze(file) {
     const sc = Math.min(1, 260 / Math.max(p.w, p.h));
     const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(p.w * sc)); c.height = Math.max(1, Math.round(p.h * sc));
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    p.thumb = await new Promise(r => c.toBlob(b => r(URL.createObjectURL(b)), 'image/jpeg', .72));
+    p.thumbBlob = await new Promise(r => c.toBlob(r, 'image/jpeg', .72));
+    p.thumb = URL.createObjectURL(p.thumbBlob);
     const h = document.createElement('canvas'); h.width = 9; h.height = 8;
     const hx = h.getContext('2d', { willReadFrequently: true }); hx.drawImage(img, 0, 0, 9, 8);
     const d = hx.getImageData(0, 0, 9, 8).data; const g = [];
@@ -207,17 +213,106 @@ function computeDups() {
   dupGroups = [...m.values()].filter(g => g.length > 1).map(g => g.sort((a, b) => (b.w * b.h - a.w * a.h) || (b.size - a.size)));
 }
 
+/* ---------- Carpetas automáticas: eventos, lugares y tipo ---------- */
+const DEF_CATS = ['Paisajes', 'Comida', 'La Tata Food', 'Diseños', 'Personas y selfies', 'Mascotas', 'Documentos y recibos', 'Capturas de pantalla', 'Otros'];
+const DEF_TATA = 'La Tata Food es mi negocio de comida: fotos de sus platos, el local, el logo, los pedidos, los tickets y la publicidad.';
+const store = { get(k, d) { try { const v = localStorage.getItem('ordena:' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('ordena:' + k, JSON.stringify(v)); } catch (e) {} } };
+S.cats = store.get('cats', DEF_CATS); S.tata = store.get('tata', DEF_TATA);
+S.autoView = 'tipo'; S.cls = null; S.expanded = new Set(); S.placeNames = {};
+let events = [], places = [];
+const shortDay = new Intl.DateTimeFormat('es', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+const km = (a, b) => { const r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r; const h = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
+function computeAuto() {
+  places = [];
+  S.photos.forEach(p => {
+    p.place = null; if (!p.gps) return;
+    let c = places.find(c => km(c.center, p.gps) < 3);
+    if (!c) { c = { id: places.length, center: p.gps.slice(), photos: [] }; places.push(c); }
+    c.photos.push(p); p.place = c.id;
+    c.center = [c.photos.reduce((s, q) => s + q.gps[0], 0) / c.photos.length, c.photos.reduce((s, q) => s + q.gps[1], 0) / c.photos.length];
+  });
+  places.forEach(c => c.key = c.center[0].toFixed(2) + ',' + c.center[1].toFixed(2));
+  events = [];
+  const asc = S.photos.slice().sort((a, b) => a.date - b.date);
+  let cur = null;
+  asc.forEach(p => { if (!cur || p.date - cur.last > 4 * 3600e3) { cur = { id: events.length, photos: [], start: p.date, last: p.date }; events.push(cur); } cur.photos.push(p); cur.last = p.date; p.event = cur.id; });
+  S.photos.forEach(p => { if (!p.cat && p.screenshot && S.cats.includes('Capturas de pantalla')) p.cat = 'Capturas de pantalla'; });
+}
+const placeName = id => { const c = places[id]; return c ? (S.placeNames[c.key] || 'Lugar ' + (id + 1)) : 'Sin ubicación'; };
+function eventName(id) {
+  const e = events[id]; if (!e) return 'Sin evento';
+  let n = cap(shortDay.format(e.start));
+  const pl = e.photos.find(p => p.place !== null); if (pl) n += ' · ' + placeName(pl.place);
+  const cnt = {}; e.photos.forEach(p => { if (p.cat && p.cat !== 'Otros') cnt[p.cat] = (cnt[p.cat] || 0) + 1; });
+  const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0]; if (top) n += ' · ' + top[0];
+  return n;
+}
+function autoFolders(view) {
+  const m = new Map(), add = (k, p) => { if (!m.has(k)) m.set(k, []); m.get(k).push(p); };
+  if (view === 'tipo') { S.photos.forEach(p => add(p.cat || 'Sin clasificar', p)); const order = [...S.cats, 'Sin clasificar']; return [...m.entries()].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0])); }
+  if (view === 'lugar') { S.photos.forEach(p => add(placeName(p.place), p)); return [...m.entries()].sort((a, b) => (a[0] === 'Sin ubicación') - (b[0] === 'Sin ubicación') || b[1].length - a[1].length); }
+  const big = events.filter(e => e.photos.length >= 3).reverse();
+  const out = big.map(e => [eventName(e.id), e.photos.slice().sort((a, b) => b.date - a.date)]);
+  const loose = events.filter(e => e.photos.length < 3).flatMap(e => e.photos);
+  if (loose.length) out.push(['Fotos sueltas', loose]);
+  return out;
+}
+async function getSample() { try { return window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { return null; } }
+function clsError(e) {
+  const c = e && e.code;
+  if (c === 'cancelled') return null;
+  if (c === 'not_granted') return 'No se dio permiso para usar Claude. Las carpetas por evento y lugar siguen funcionando.';
+  if (c === 'rate_limited') return 'Claude pidió una pausa. Espera un minuto y toca «Continuar».';
+  return 'Se detuvo la clasificación (' + (c || 'error') + '). Toca «Continuar» para seguir.';
+}
+async function namePlaces(sample) {
+  const todo = places.filter(c => !S.placeNames[c.key]).slice(0, 60); if (!todo.length) return;
+  try {
+    const r = await sample.json('Para cada coordenada GPS (latitud, longitud) escribe el nombre corto del lugar en español: barrio o distrito y ciudad, o el lugar conocido más cercano (máximo 4 palabras). Responde solo con un arreglo JSON: [{"k":"<la clave>","n":"<nombre>"}].\n' + todo.map(c => c.key).join('\n'), { modelTier: 'quick', cache: { gcTime: 86400000 } });
+    (Array.isArray(r) ? r : []).forEach(o => { if (o && o.k && o.n && todo.some(c => c.key === o.k)) S.placeNames[o.k] = String(o.n).slice(0, 40).replace(/[\\/:*?"<>|]/g, '-'); });
+  } catch (e) {}
+}
+async function autoRun() {
+  if (S.cls && S.cls.running) return;
+  if (!S.cats.includes('Otros')) S.cats.push('Otros');
+  computeAuto();
+  const todo = S.photos.filter(p => !p.cat && p.thumbBlob);
+  S.cls = { running: true, done: 0, total: todo.length, ctrl: new AbortController(), error: null };
+  render();
+  const sample = await getSample();
+  if (!sample) { S.cls = { error: 'Eventos y lugares ya están listos. La clasificación por tipo (paisajes, diseños, La Tata Food…) funciona cuando abres esta app dentro de Claude.' }; render(); return; }
+  let caps = null; try { caps = await sample.limits(); } catch (e) {}
+  if (places.length) await namePlaces(sample);
+  if (!caps || !caps.images) { S.cls = { error: 'En esta vista no se pueden enviar imágenes a Claude, así que la clasificación por tipo no está disponible.' }; render(); return; }
+  const per = Math.max(1, Math.min(caps.images.maxCount || 1, 10));
+  const cats = S.cats.slice();
+  for (let i = 0; i < todo.length && S.cls.running; i += per) {
+    const batch = todo.slice(i, i + per);
+    const prompt = `Te envío ${batch.length} miniaturas de fotos de la galería del iPhone de una persona, en orden (de la 1 a la ${batch.length}). Pon cada foto en UNA sola de estas carpetas: ${cats.map(c => '"' + c + '"').join(', ')}.\n` +
+      (S.tata ? `Contexto que dio la persona: ${S.tata}\n` : '') +
+      `"Diseños" son imágenes hechas en computadora o celular: logos, afiches, flyers, menús, artes para redes sociales. Si ninguna carpeta encaja, usa "Otros".\nResponde solo con un arreglo JSON, sin texto extra: [{"i":1,"c":"<carpeta>"}]`;
+    try {
+      const r = await sample.json(prompt, { images: batch.map(p => p.thumbBlob), modelTier: 'quick', signal: S.cls.ctrl.signal });
+      (Array.isArray(r) ? r : []).forEach(o => { const p = batch[(+(o && o.i)) - 1]; if (p) p.cat = cats.includes(o.c) ? o.c : 'Otros'; });
+    } catch (e) { S.cls.error = clsError(e); break; }
+    S.cls.done += batch.length;
+    if (S.tab === 'auto') renderView(); renderTabs();
+  }
+  S.cls.running = false; render();
+  if (!S.cls.error && S.cls.total) toast('Fotos ordenadas en carpetas');
+}
+
 /* ---------- Cargar fotos ---------- */
 async function addFiles(files, isSample) {
   files = [...files].filter(f => f.type.startsWith('image/') || /\.(heic|heif|jpe?g|png|gif|webp)$/i.test(f.name));
   if (!files.length) return;
-  if (!isSample && S.sample) { S.photos.forEach(p => p.thumb && URL.revokeObjectURL(p.thumb)); S.photos = []; S.albums = []; S.sel.clear(); S.sample = false; }
+  if (!isSample && S.sample) { S.photos.forEach(p => p.thumb && URL.revokeObjectURL(p.thumb)); S.photos = []; S.albums = []; S.sel.clear(); S.sample = false; S.placeNames = {}; S.cls = null; }
   S.busy = { done: 0, total: files.length }; renderNotice();
   const queue = files.slice(); const out = [];
   const worker = async () => { while (queue.length) { const f = queue.shift(); out.push(await analyze(f)); S.busy.done++; if (S.busy.done % 4 === 0) renderNotice(); } };
   await Promise.all([worker(), worker(), worker()]);
   S.photos.push(...out); S.photos.sort((a, b) => b.date - a.date);
-  S.busy = null; computeDups(); render();
+  S.busy = null; computeDups(); computeAuto(); render();
   if (!isSample) toast(out.length + ' fotos cargadas');
 }
 $('#pick').addEventListener('change', e => { addFiles(e.target.files, false); e.target.value = ''; });
@@ -243,9 +338,9 @@ function renderNotice() {
   else if (S.sample) h = `<div class="note"><b>Estas son fotos de ejemplo.</b> Toca «Elegir fotos» para cargar las tuyas desde la galería del iPhone. Puedes elegir muchas a la vez; tus fotos no salen de tu teléfono.</div>`;
   $('#notice').innerHTML = h;
 }
-const TABS = [['fechas', 'Por fecha'], ['revisar', 'Revisar una a una'], ['dups', 'Duplicados'], ['capturas', 'Capturas'], ['albumes', 'Álbumes'], ['borrar', 'Para borrar']];
+const TABS = [['auto', 'Carpetas automáticas'], ['fechas', 'Por fecha'], ['revisar', 'Revisar una a una'], ['dups', 'Duplicados'], ['capturas', 'Capturas'], ['albumes', 'Álbumes'], ['borrar', 'Para borrar']];
 function renderTabs() {
-  const cnt = { dups: dupGroups.length, capturas: S.photos.filter(p => p.screenshot).length, albumes: S.albums.length, borrar: S.photos.filter(p => p.del).length, revisar: S.photos.filter(p => !p.reviewed).length, fechas: S.photos.length };
+  const cnt = { dups: dupGroups.length, capturas: S.photos.filter(p => p.screenshot).length, albumes: S.albums.length, borrar: S.photos.filter(p => p.del).length, revisar: S.photos.filter(p => !p.reviewed).length, fechas: S.photos.length, auto: autoFolders(S.autoView).length };
   $('#tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${S.tab === k}">${l}<em>${cnt[k]}</em></button>`).join('');
 }
 function groupHead(title, sub, ids, extraBtns = '') {
@@ -255,7 +350,26 @@ function renderView() {
   const v = $('#view'); const ps = S.photos;
   if (S.tab !== 'revisar' && S.reviewUrl) { URL.revokeObjectURL(S.reviewUrl); S.reviewUrl = null; }
   if (!ps.length) { v.innerHTML = '<p class="empty">Todavía no hay fotos. Toca «Elegir fotos» para empezar.</p>'; return; }
-  if (S.tab === 'fechas') {
+  if (S.tab === 'auto') {
+    const c = S.cls, running = c && c.running, pending = ps.filter(p => !p.cat && p.thumbBlob).length;
+    const views = [['tipo', 'Por tipo'], ['evento', 'Por evento'], ['lugar', 'Por lugar']];
+    const folders = autoFolders(S.autoView);
+    const withGps = ps.filter(p => p.gps).length;
+    let h = `<div class="panel"><h2>Carpetas automáticas</h2>
+      <div style="color:var(--muted);font-size:14px">Ordeno tus fotos en carpetas por <b>tipo</b> (paisajes, comida, La Tata Food, diseños…), por <b>evento</b> (fotos tomadas el mismo día y a la misma hora) y por <b>lugar</b> (según la ubicación GPS de la foto). Para el tipo, Claude mira una miniatura pequeña de cada foto.</div>
+      <label style="display:grid;gap:4px">Carpetas por tipo (separadas por comas)<input type="text" id="catsIn" value="${esc(S.cats.join(', '))}"></label>
+      <label style="display:grid;gap:4px">¿Qué es La Tata Food u otra cosa que Claude deba reconocer?<input type="text" id="tataIn" value="${esc(S.tata)}"></label>
+      <div class="row">${running ? `<button data-act="autoStop">Detener</button><span>Clasificando… ${c.done} de ${c.total}</span>` : `<button class="primary" data-act="autoRun">${pending && pending < ps.length ? 'Continuar (' + pending + ' sin clasificar)' : pending ? 'Ordenar automáticamente' : 'Volver a ordenar'}</button>`}</div>
+      ${running && c.total ? `<div class="progress"><i style="width:${(c.done / c.total * 100).toFixed(1)}%"></i></div>` : ''}
+      ${c && c.error ? `<div class="note" style="margin:0">${esc(c.error)}</div>` : ''}
+      ${S.autoView === 'lugar' && !S.sample && ps.length && !withGps ? `<div class="note" style="margin:0">Estas fotos no traen ubicación. Al elegirlas en el iPhone, toca <b>Opciones</b> arriba en la galería y activa <b>Ubicación</b>, y vuelve a cargarlas.</div>` : ''}
+      </div>
+      <div class="tabs" style="margin-top:0">${views.map(([k, l]) => `<button data-autoview="${k}" aria-selected="${S.autoView === k}">${l}</button>`).join('')}</div>
+      <div class="row" style="margin-bottom:14px"><button data-act="autoAlbums">Convertir estas carpetas en álbumes</button></div>`;
+    h += folders.map(([name, g]) => { const key = S.autoView + ':' + name, open = S.expanded.has(key), show = open ? g : g.slice(0, 24);
+      return `<section class="group">${groupHead(name, g.length + ' fotos', g.map(p => p.id))}<div class="grid">${show.map(p => tile(p)).join('')}</div>${g.length > 24 ? `<div class="row" style="margin-top:8px"><button class="ghost" data-expand="${esc(key)}">${open ? 'Ver menos' : 'Ver las ' + g.length}</button></div>` : ''}</section>`; }).join('');
+    v.innerHTML = h;
+  } else if (S.tab === 'fechas') {
     const groups = new Map(); ps.forEach(p => { const k = monthKey(p.date); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); });
     v.innerHTML = [...groups.values()].map(g => `<section class="group">${groupHead(monthLabel(g[0].date), g.length + ' fotos', g.map(p => p.id))}<div class="grid">${g.map(p => tile(p)).join('')}</div></section>`).join('');
   } else if (S.tab === 'dups') {
@@ -305,6 +419,8 @@ document.addEventListener('click', e => {
   if (t.dataset.tab) { S.tab = t.dataset.tab; S.sel.clear(); render(); window.scrollTo(0, 0); return; }
   if (t.dataset.id && t.classList.contains('ph')) { const id = +t.dataset.id; S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); t.classList.toggle('sel'); renderBar(); return; }
   if (t.dataset.selall !== undefined) { const ids = t.dataset.selall.split(',').filter(Boolean).map(Number); const all = ids.every(i => S.sel.has(i)); ids.forEach(i => all ? S.sel.delete(i) : S.sel.add(i)); renderView(); renderBar(); return; }
+  if (t.dataset.autoview) { S.autoView = t.dataset.autoview; S.sel.clear(); render(); return; }
+  if (t.dataset.expand) { const k = t.dataset.expand; S.expanded.has(k) ? S.expanded.delete(k) : S.expanded.add(k); renderView(); return; }
   if (t.dataset.dupmark !== undefined) { setDel(dupGroups[+t.dataset.dupmark].slice(1).map(p => p.id), true); render(); return; }
   if (t.dataset.markids) { setDel(t.dataset.markids.split(',').map(Number), true); render(); toast('Marcadas para borrar'); return; }
   if (t.dataset.delalb) { const a = t.dataset.delalb; S.albums = S.albums.filter(x => x !== a); S.photos.forEach(p => { if (p.album === a) p.album = null; }); render(); return; }
@@ -321,6 +437,9 @@ document.addEventListener('click', e => {
   else if (a === 'resetReview') { S.photos.forEach(p => p.reviewed = false); S.lastReview = []; render(); }
   else if (a === 'undoReview') { const r = S.lastReview.pop(); if (r) { const p = byId(r.id); p.reviewed = false; p.del = r.del; } render(); }
   else if (a === 'doExport') doExport();
+  else if (a === 'autoRun') autoRun();
+  else if (a === 'autoStop') { if (S.cls) { S.cls.running = false; S.cls.ctrl && S.cls.ctrl.abort(); } render(); }
+  else if (a === 'autoAlbums') { let n = 0; autoFolders(S.autoView).forEach(([name, g]) => { if (/^(Sin clasificar|Sin ubicación|Fotos sueltas)$/.test(name)) return; const al = addAlbum(name); g.forEach(p => { if (!p.album) { p.album = al; n++; } }); }); render(); toast(n + ' fotos agregadas a álbumes'); }
   else if (a === 'closeExport') { S.exporting = false; $('#bar').hidden = true; renderBar(); }
 });
 document.addEventListener('change', e => {
@@ -331,6 +450,8 @@ document.addEventListener('change', e => {
     S.sel.clear(); render();
   }
   if (e.target.name === 'expBy') S.exportBy = e.target.value;
+  if (e.target.id === 'catsIn') { const c = e.target.value.split(',').map(x => x.trim().replace(/[\\/:*?"<>|]/g, '-')).filter(Boolean); S.cats = c.length ? [...new Set(c)] : DEF_CATS.slice(); if (!S.cats.includes('Otros')) S.cats.push('Otros'); store.set('cats', S.cats); S.photos.forEach(p => { if (p.cat && !S.cats.includes(p.cat)) p.cat = null; }); render(); }
+  if (e.target.id === 'tataIn') { S.tata = e.target.value.trim(); store.set('tata', S.tata); }
   if (e.target.id === 'exclDel') S.exclDel = e.target.checked;
 });
 document.addEventListener('submit', e => { if (e.target.id === 'albForm') { e.preventDefault(); const n = addAlbum($('#albName').value); if (n) { render(); toast('Álbum «' + n + '» creado'); } } });
@@ -353,7 +474,7 @@ $('#exportBtn').addEventListener('click', () => {
   S.sel.clear(); S.exporting = true; renderView();
   const b = $('#bar'); b.hidden = false;
   b.innerHTML = `<div class="in" style="display:grid;gap:8px"><strong>Exportar fotos ordenadas en carpetas (.zip)</strong>
-    <label><input type="radio" name="expBy" value="album" ${S.exportBy === 'album' ? 'checked' : ''}> Por álbum (las demás, por mes)</label>
+    ${[['tipo', 'Por tipo (paisajes, La Tata Food, diseños…)'], ['evento', 'Por evento'], ['lugar', 'Por lugar'], ['album', 'Por álbum (las demás, por mes)']].map(([k, l]) => `<label><input type="radio" name="expBy" value="${k}" ${S.exportBy === k ? 'checked' : ''}> ${l}</label>`).join('')}
     <label><input type="radio" name="expBy" value="mes" ${S.exportBy === 'mes' ? 'checked' : ''}> Solo por mes</label>
     <label><input type="checkbox" id="exclDel" ${S.exclDel ? 'checked' : ''}> No incluir las marcadas para borrar</label>
     <div id="expProg" style="color:var(--muted);font-size:13px">En el iPhone el .zip se guarda en la app Archivos; al abrirlo verás una carpeta por mes o álbum.</div>
@@ -374,7 +495,9 @@ async function doExport() {
   if (!list.length) { toast('No hay fotos para exportar'); return; }
   const zip = new JSZip(); const used = new Set();
   list.forEach(p => {
-    const folder = (S.exportBy === 'album' && p.album) ? p.album : `${monthKey(p.date)} ${monthLabel(p.date)}`;
+    const by = S.exportBy, month = `${monthKey(p.date)} ${monthLabel(p.date)}`;
+    const raw = by === 'album' ? p.album : by === 'tipo' ? (p.cat || 'Sin clasificar') : by === 'evento' ? (events[p.event] && events[p.event].photos.length >= 3 ? eventName(p.event) : 'Fotos sueltas') : by === 'lugar' ? placeName(p.place) : null;
+    const folder = (raw || month).replace(/[\\/:*?"<>|]/g, '-');
     let n = p.name.replace(/[\\/:*?"<>|]/g, '-'), path = folder + '/' + n, k = 2;
     while (used.has(path.toLowerCase())) { path = folder + '/' + n.replace(/(\.[^.]*)?$/, m => '-' + k + m); k++; }
     used.add(path.toLowerCase());
@@ -401,7 +524,7 @@ async function makeSample() {
   const specs = [
     ['IMG_0412.jpg', scene('#ffb070', '#ffe2b8', '#4d6b3a', '#fff4d6'), ago(0, 3)],
     ['IMG_0413.jpg', scene('#ffb070', '#ffe2b8', '#4d6b3a', '#fff4d6'), ago(0, 3), .5],
-    ['IMG_0398.jpg', scene('#3d7bd9', '#bfe0ff', '#c9a86a', '#ffffff'), ago(0, 1)],
+    ['IMG_0398.jpg', scene('#3d7bd9', '#bfe0ff', '#c9a86a', '#ffffff'), ago(0, 3) + 3600e3],
     ['IMG_0350.jpg', scene('#21304f', '#5b6fa3', '#1b2235', '#f2f0d8'), ago(1, 20)],
     ['IMG_0351.jpg', scene('#7a4fbf', '#f2a6c9', '#2c3a52', '#ffe9f2'), ago(1, 12)],
     ['IMG_0302.jpg', scene('#2aa69a', '#d7f5ef', '#3a5f43', '#ffffff'), ago(2, 7)],
@@ -412,7 +535,12 @@ async function makeSample() {
   const shot = await mk(390, 844, (x, w, h) => { x.fillStyle = '#f4f4f7'; x.fillRect(0, 0, w, h); x.fillStyle = '#2f5bea'; x.fillRect(0, 0, w, 90); x.fillStyle = '#d8dbe5'; for (let i = 0; i < 7; i++) x.fillRect(20, 120 + i * 95, w - 40, 70); }, 'image/png');
   files.push(new File([shot], 'Captura 2.png', { type: 'image/png', lastModified: ago(1, 2) }));
   await addFiles(files, true);
-  if (S.sample) { addAlbum('Paisajes'); setAlbum(S.photos.filter(p => /0398|0302/.test(p.name)).map(p => p.id), 'Paisajes'); render(); }
+  if (S.sample) {
+    const cats = { '0412': 'Paisajes', '0413': 'Paisajes', '0398': 'Paisajes', '0350': 'Paisajes', '0351': 'Diseños', '0302': 'Comida', '0303': 'Comida' };
+    S.photos.forEach(p => { const k = (p.name.match(/\d{4}/) || [])[0]; if (cats[k]) p.cat = cats[k]; if (/0412|0413|0398/.test(p.name)) p.gps = [-12.122, -77.03]; if (/0302|0303/.test(p.name)) p.gps = [-12.046, -77.043]; });
+    computeAuto(); places.forEach((c, i) => S.placeNames[c.key] = i ? 'Ejemplo: Centro' : 'Ejemplo: Playa');
+    addAlbum('Favoritas'); setAlbum(S.photos.filter(p => /0398/.test(p.name)).map(p => p.id), 'Favoritas'); render();
+  }
 }
 render(); makeSample();
 })();
