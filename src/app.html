@@ -93,6 +93,7 @@ select,input[type="text"]{font:500 14px var(--body);border:1px solid var(--line)
     </div>
     <div class="btns">
       <label class="btn primary" for="pick">Elegir fotos<input id="pick" type="file" accept="image/*" multiple></label>
+      <label class="btn" for="pickDir" id="pickDirLbl" hidden>Elegir carpeta<input id="pickDir" type="file" webkitdirectory multiple></label>
       <button id="exportBtn">Exportar ordenadas</button>
     </div>
   </div>
@@ -316,6 +317,8 @@ async function addFiles(files, isSample) {
   if (!isSample) toast(out.length + ' fotos cargadas');
 }
 $('#pick').addEventListener('change', e => { addFiles(e.target.files, false); e.target.value = ''; });
+$('#pickDir').addEventListener('change', e => { addFiles(e.target.files, false); e.target.value = ''; });
+if ('webkitdirectory' in document.createElement('input') && !/iPhone|iPad|iPod/.test(navigator.userAgent)) $('#pickDirLbl').hidden = false;
 
 /* ---------- Acciones ---------- */
 const byId = id => S.photos.find(p => p.id === id);
