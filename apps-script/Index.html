@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3a5f">
+<title>Aula Virtual</title>
+<style>
+/* Una columna para celular; en pantallas anchas se centra a 760px. Barra inferior de navegación. */
+:root{
+  --bg:#f4f6f9; --surface:#fff; --fg:#17202e; --muted:#5b6678; --line:#dfe4ec;
+  --accent:#1f5fae; --accent-ink:#fff; --accent-soft:#e6eefa;
+  --ok:#17824f; --ok-soft:#e1f4ea; --warn:#a86200; --warn-soft:#fdf0dc; --bad:#c2352f; --bad-soft:#fbe6e5;
+  --font:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f141c; --surface:#18202b; --fg:#e7ebf2; --muted:#9aa6b8; --line:#2a3443;
+  --accent:#6ea3ec; --accent-ink:#0f141c; --accent-soft:#1c2c45;
+  --ok:#4cc68a; --ok-soft:#163327; --warn:#f0a945; --warn-soft:#3a2a12; --bad:#ff7b72; --bad-soft:#3d1c1c; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 var(--font);-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-left)) 96px max(16px,env(safe-area-inset-right))}
+h1{font-size:1.5rem;margin:0 0 4px;letter-spacing:-.01em}
+h2{font-size:1.15rem;margin:0}
+h3{font-size:1rem;margin:0}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.86rem}
+.top{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.top .grow{flex:1;min-width:0}
+.top h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.back{border:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;width:42px;height:42px;font-size:20px;flex:none;color:var(--fg)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:10px}
+.list{display:grid;gap:10px;margin:0 0 16px}
+.item{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-align:left;width:100%;color:var(--fg);font:inherit}
+button.item{cursor:pointer}
+.item .grow{flex:1;min-width:0}
+.item .grow b{display:block;overflow-wrap:anywhere}
+.ico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700;flex:none;font-size:15px}
+.btn{font:600 15px var(--font);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:11px 16px;min-height:46px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.small{min-height:36px;padding:6px 12px;font-size:14px}
+.btn:disabled{opacity:.55}
+.btn.block{width:100%}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+label.f{display:grid;gap:5px;font-weight:600;font-size:.92rem}
+input,select,textarea{font:16px var(--font);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:10px;padding:11px 12px;width:100%;min-height:46px}
+textarea{min-height:160px;resize:vertical;line-height:1.5}
+input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visible,.item:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:0 0 14px;scrollbar-width:none}
+.tabs button{flex:none;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 14px var(--font);padding:8px 14px;min-height:38px}
+.tabs button[aria-selected=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 16px}
+@media(min-width:620px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px}
+.stat b{display:block;font-size:1.5rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.8rem;color:var(--muted)}
+.pill{display:inline-block;border-radius:999px;padding:3px 9px;font-size:.78rem;font-weight:700;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.info{background:var(--accent-soft);color:var(--accent)}
+.note{background:var(--accent-soft);border-radius:12px;padding:10px 12px;font-size:.92rem}
+.note.warn{background:var(--warn-soft)} .note.bad{background:var(--bad-soft)}
+.sect{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:18px 0 10px}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px max(8px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-right));z-index:20}
+.nav button{flex:1;max-width:160px;border:0;background:none;color:var(--muted);font:600 12px var(--font);display:grid;justify-items:center;gap:2px;padding:6px 0;min-height:52px}
+.nav button svg{width:24px;height:24px}
+.nav button[aria-current=true]{color:var(--accent)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface);font-size:.78rem;color:var(--muted)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.prog{height:8px;border-radius:8px;background:var(--line);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:var(--fg);color:var(--bg);padding:11px 16px;border-radius:12px;z-index:50;max-width:90vw;font-weight:600}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:end center;z-index:40;padding:16px}
+.modal .card{width:min(100%,520px);max-height:85vh;overflow:auto;margin-bottom:env(safe-area-inset-bottom)}
+@media(min-width:620px){.modal{place-items:center}}
+.imp{background:var(--warn);color:#fff;padding:8px 16px;text-align:center;font-weight:600;font-size:.9rem}
+.imp button{background:#fff;color:var(--warn);border:0;border-radius:8px;padding:4px 10px;font-weight:700;margin-left:6px}
+.answer{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border-radius:10px;padding:12px;border:1px solid var(--line)}
+.files{display:grid;gap:6px}
+.files a{color:var(--accent);overflow-wrap:anywhere}
+.q{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px}
+.q label.opt{display:flex;gap:10px;align-items:center;font-weight:400}
+.q label.opt input{width:22px;min-height:22px;height:22px}
+.spinner{display:grid;place-items:center;padding:40px;color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:24px 8px}
+.chart{width:100%;height:auto;display:block}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="imp" class="imp" hidden></div>
+<main class="wrap" id="app"><div class="spinner">Cargando…</div></main>
+<nav class="nav" id="nav" hidden></nav>
+<div id="toast" class="toast" hidden></div>
+<div id="modal" class="modal" hidden></div>
+<script>
+/* ======================= Base ======================= */
+const S = { token: null, user: null, cfg: { nombre: 'Aula Virtual', notaMaxima: 20 }, stack: [], tab: {}, adminToken: null, adminUser: null };
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = { get(k) { try { return localStorage.getItem('av:' + k); } catch (e) { return null; } }, set(k, v) { try { v === null ? localStorage.removeItem('av:' + k) : localStorage.setItem('av:' + k, v); } catch (e) {} } };
+const fFecha = ms => ms ? new Date(ms).toLocaleString('es-PE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+const fDia = ms => ms ? new Date(ms).toLocaleDateString('es-PE', { day: 'numeric', month: 'short' }) : '';
+const fTam = b => b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB';
+function hace(ms) {
+  if (!ms) return 'Nunca entró';
+  const m = (Date.now() - ms) / 60000;
+  if (m < 2) return 'Conectado ahora'; if (m < 60) return 'Hace ' + Math.round(m) + ' min';
+  const h = m / 60; if (h < 24) return 'Hace ' + Math.round(h) + ' h';
+  const d = h / 24; return d < 2 ? 'Ayer' : 'Hace ' + Math.round(d) + ' días';
+}
+const fMin = m => m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+const TIPOS = { foro: 'Comentario privado', archivo: 'Subir archivos', formulario: 'Formulario', parcial: 'Examen parcial', final: 'Examen final' };
+const ICONOS = { foro: '✎', archivo: '⇪', formulario: '☰', parcial: 'P', final: 'F' };
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 3200); }
+function call(accion, datos) {
+  return new Promise((ok, ko) => {
+    if (!window.google || !google.script) { ko(new Error('Abre esta app desde su enlace de Google.')); return; }
+    google.script.run.withSuccessHandler(r => {
+      if (r && r.ok) ok(r.data);
+      else if (r && r.error === 'SESION') { salirLocal(); toast('Tu sesión terminó. Vuelve a entrar.'); ko(new Error('SESION')); }
+      else ko(new Error(r ? r.error : 'Error'));
+    }).withFailureHandler(e => ko(new Error(e && e.message ? e.message : 'Sin conexión. Revisa tu internet e inténtalo otra vez.'))).api(accion, S.token, datos || {});
+  });
+}
+async function act(btn, fn) {
+  const b = btn && btn.tagName ? btn : null, txt = b ? b.textContent : '';
+  if (b) { b.disabled = true; b.textContent = 'Un momento…'; }
+  try { return await fn(); } catch (e) { if (e.message !== 'SESION') toast(e.message); return undefined; } finally { if (b && b.isConnected) { b.disabled = false; b.textContent = txt; } }
+}
+function preguntar(msg, si, no) {
+  return new Promise(res => {
+    const m = $('#modal'); m.hidden = false;
+    m.innerHTML = `<div class="card" role="dialog" aria-modal="true"><p>${msg}</p><div class="row"><button class="btn primary" id="mSi">${esc(si || 'Sí')}</button><button class="btn" id="mNo">${esc(no || 'Cancelar')}</button></div></div>`;
+    $('#mSi').onclick = () => { m.hidden = true; res(true); }; $('#mNo').onclick = () => { m.hidden = true; res(false); };
+  });
+}
+function modal(html) { const m = $('#modal'); m.hidden = false; m.innerHTML = `<div class="card" role="dialog" aria-modal="true">${html}</div>`; m.onclick = e => { if (e.target === m) cerrarModal(); }; return m; }
+function cerrarModal() { const m = $('#modal'); m.hidden = true; m.innerHTML = ''; }
+
+/* ======================= Navegación ======================= */
+const VISTAS = {};
+function ir(vista, params, reemplazar) { if (reemplazar) S.stack.pop(); S.stack.push({ vista, params: params || {} }); pintar(); window.scrollTo(0, 0); }
+function atras() { if (S.stack.length > 1) { S.stack.pop(); pintar(); window.scrollTo(0, 0); } }
+function raiz(vista) { S.stack = [{ vista, params: {} }]; pintar(); window.scrollTo(0, 0); }
+async function pintar() {
+  const cur = S.stack[S.stack.length - 1]; if (!cur) return;
+  pintarNav(cur.vista);
+  const app = $('#app');
+  try { await VISTAS[cur.vista](app, cur.params); } catch (e) { if (e.message !== 'SESION') app.innerHTML = cabecera('Algo salió mal', true) + `<div class="note bad">${esc(e.message)}</div><div class="row" style="margin-top:12px"><button class="btn" onclick="pintar()">Reintentar</button></div>`; }
+}
+function cabecera(titulo, conAtras, sub) {
+  return `<div class="top">${conAtras && S.stack.length > 1 ? '<button class="back" onclick="atras()" aria-label="Volver">‹</button>' : ''}<div class="grow"><h1>${esc(titulo)}</h1>${sub ? `<p class="muted small">${sub}</p>` : ''}</div></div>`;
+}
+const SVG = {
+  casa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+  gente: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.6c2.6.2 4.6 1.9 5.3 5.4"/></svg>',
+  notas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  yo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>'
+};
+function pintarNav(vista) {
+  const nav = $('#nav');
+  if (!S.user || ['login', 'registro', 'forzarClave'].indexOf(vista) >= 0) { nav.hidden = true; return; }
+  const items = S.user.rol === 'profesor'
+    ? [['pInicio', 'Inicio', SVG.casa], ['pEstudiantes', 'Estudiantes', SVG.gente], ['pComparativo', 'Notas', SVG.notas], ['perfil', 'Mi cuenta', SVG.yo]]
+    : [['eInicio', 'Mis aulas', SVG.casa], ['eNotas', 'Mis notas', SVG.notas], ['perfil', 'Mi cuenta', SVG.yo]];
+  const raizActual = S.stack[0] && S.stack[0].vista;
+  nav.hidden = false;
+  nav.innerHTML = items.map(([v, l, i]) => `<button onclick="raiz('${v}')" aria-current="${raizActual === v}">${i}<span>${l}</span></button>`).join('');
+}
+
+/* ======================= Sesión ======================= */
+function entrar(r) {
+  S.token = r.token; S.user = r.usuario; store.set('token', r.token);
+  pintarImp();
+  if (S.user.debeCambiarClave && !S.user.imp) return raiz('forzarClave');
+  raiz(S.user.rol === 'profesor' ? 'pInicio' : 'eInicio');
+}
+function salirLocal() { S.token = null; S.user = null; store.set('token', null); S.adminToken = null; pintarImp(); raiz('login'); }
+function pintarImp() {
+  const b = $('#imp');
+  if (S.adminToken && S.user) { b.hidden = false; b.innerHTML = `Estás viendo la cuenta de ${esc(S.user.nombres)} ${esc(S.user.apellidos)} <button onclick="volverAdmin()">Volver a mi cuenta</button>`; }
+  else b.hidden = true;
+}
+function volverAdmin() { S.token = S.adminToken; S.user = S.adminUser; S.adminToken = null; store.set('token', S.token); pintarImp(); raiz('pEstudiantes'); }
+let pingT = 0, ultimoPing = Date.now();
+function iniciarPing() {
+  clearInterval(pingT);
+  pingT = setInterval(() => { if (document.visibilityState === 'visible' && S.token && !S.adminToken) { const min = Math.round((Date.now() - ultimoPing) / 60000); ultimoPing = Date.now(); call('ping', { minutos: min }).catch(() => {}); } else ultimoPing = Date.now(); }, 120000);
+}
+
+VISTAS.login = async app => {
+  app.innerHTML = `<div style="max-width:420px;margin:8vh auto 0;display:grid;gap:16px">
+    <div><h1>${esc(S.cfg.nombre)}</h1><p class="muted">Entra con tu DNI o tu correo.</p></div>
+    <form class="card" id="fLogin" autocomplete="on">
+      <label class="f">DNI o correo<input id="lUser" name="username" autocomplete="username" inputmode="text" required></label>
+      <label class="f">Contraseña<input id="lClave" name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary block" type="submit">Entrar</button>
+    </form>
+    <div class="card"><b>¿Es tu primera vez?</b><p class="muted small">Crea tu cuenta con tu DNI, tus datos y el código de aula que te dio tu profesor.</p><button class="btn block" onclick="ir('registro')">Crear mi cuenta</button></div>
+    <p class="muted small">¿Olvidaste tu contraseña? Pídele a tu profesor que la restablezca.</p>
+  </div>`;
+  $('#fLogin').onsubmit = e => { e.preventDefault(); act(e.submitter, async () => entrar(await call('login', { usuario: $('#lUser').value, clave: $('#lClave').value }))); };
+};
+VISTAS.registro = async app => {
+  app.innerHTML = cabecera('Crear mi cuenta', true, 'Solo la primera vez.') + `<form class="card" id="fReg">
+    <label class="f">DNI<input id="rDni" inputmode="numeric" maxlength="12" autocomplete="off" required></label>
+    <label class="f">Nombres<input id="rNom" autocomplete="given-name" required></label>
+    <label class="f">Apellidos completos<input id="rApe" autocomplete="family-name" required></label>
+    <label class="f">Celular<input id="rCel" type="tel" inputmode="tel" autocomplete="tel" required></label>
+    <label class="f">Correo<input id="rCor" type="email" autocomplete="email" required><span class="muted small">También podrás entrar con tu correo en lugar del DNI.</span></label>
+    <label class="f">Contraseña<input id="rC1" type="password" autocomplete="new-password" minlength="6" required></label>
+    <label class="f">Repite la contraseña<input id="rC2" type="password" autocomplete="new-password" minlength="6" required></label>
+    <label class="f">Código del aula<input id="rCod" autocomplete="off" style="text-transform:uppercase" placeholder="Ej.: K7M2QX"><span class="muted small">Te lo da tu profesor. Si no lo tienes, puedes agregarlo después.</span></label>
+    <p class="muted small">Tus datos solo los ve tu profesor y se usan para tus clases.</p>
+    <button class="btn primary block" type="submit">Crear cuenta</button></form>`;
+  $('#fReg').onsubmit = e => {
+    e.preventDefault();
+    if ($('#rC1').value !== $('#rC2').value) return toast('Las contraseñas no coinciden.');
+    act(e.submitter, async () => entrar(await call('registrar', { dni: $('#rDni').value, nombres: $('#rNom').value, apellidos: $('#rApe').value, celular: $('#rCel').value, correo: $('#rCor').value, clave: $('#rC1').value, codigo: $('#rCod').value })));
+  };
+};
+VISTAS.forzarClave = async app => {
+  app.innerHTML = `<div style="max-width:420px;margin:6vh auto 0;display:grid;gap:14px"><div><h1>Crea tu nueva contraseña</h1><p class="muted">Por seguridad, cambia la contraseña que te dieron.</p></div>${formClave(true)}</div>`;
+  bindClave(() => raiz(S.user.rol === 'profesor' ? 'pInicio' : 'eInicio'));
+};
+function formClave(forzada) {
+  return `<form class="card" id="fClave"><label class="f">Contraseña actual<input id="cA" type="password" autocomplete="current-password" required></label>
+    <label class="f">Nueva contraseña<input id="cN" type="password" autocomplete="new-password" minlength="6" required></label>
+    <label class="f">Repite la nueva<input id="cN2" type="password" autocomplete="new-password" minlength="6" required></label>
+    <button class="btn primary" type="submit">${forzada ? 'Guardar y continuar' : 'Cambiar contraseña'}</button></form>`;
+}
+function bindClave(despues) {
+  $('#fClave').onsubmit = e => {
+    e.preventDefault(); if ($('#cN').value !== $('#cN2').value) return toast('Las contraseñas nuevas no coinciden.');
+    act(e.submitter, async () => { await call('cambiarClave', { actual: $('#cA').value, nueva: $('#cN').value }); S.user.debeCambiarClave = false; toast('Contraseña cambiada'); despues && despues(); });
+  };
+}
+VISTAS.perfil = async app => {
+  const u = S.user;
+  app.innerHTML = cabecera('Mi cuenta') + `<div class="card"><b>${esc(u.nombres)} ${esc(u.apellidos)}</b><p class="muted small">DNI ${esc(u.dni)} · ${u.rol === 'profesor' ? 'Profesor' : 'Estudiante'}</p>
+    <form class="row" id="fPerfil" style="display:grid;gap:10px"><label class="f">Celular<input id="pCel" type="tel" value="${esc(u.celular)}"></label><label class="f">Correo<input id="pCor" type="email" value="${esc(u.correo)}"></label><button class="btn" type="submit">Guardar datos</button></form></div>
+    <div class="sect"><h2>Cambiar contraseña</h2></div>${formClave(false)}
+    ${u.rol === 'profesor' ? '<div class="sect"><h2>Detector de IA</h2></div><div class="card" id="cIA"><div class="spinner">…</div></div>' : ''}
+    <div class="row" style="margin-top:18px"><button class="btn danger" id="bSalir">Cerrar sesión</button></div>`;
+  $('#fPerfil').onsubmit = e => { e.preventDefault(); act(e.submitter, async () => { S.user = Object.assign(S.user, await call('actualizarPerfil', { celular: $('#pCel').value, correo: $('#pCor').value })); toast('Datos guardados'); }); };
+  bindClave();
+  $('#bSalir').onclick = () => act(null, async () => { await call('salir').catch(() => {}); salirLocal(); });
+  if (u.rol === 'profesor') pintarIA();
+};
+async function pintarIA() {
+  const p = await call('panel'), c = $('#cIA'); if (!c) return;
+  c.innerHTML = `<p>${p.iaActiva ? '<span class="pill ok">Activo</span> Las respuestas se revisan también con Claude.' : '<span class="pill info">Básico</span> Ahora se usan solo indicios locales: texto pegado, velocidad al escribir y frases típicas.'}</p>
+    <p class="muted small">Para una revisión más fina, pega una clave de la API de Claude (console.anthropic.com). Cada revisión cuesta unos centavos. Nunca es una prueba: úsalo como alerta para revisar tú.</p>
+    <div class="row"><input id="iaKey" type="password" placeholder="sk-ant-..." autocomplete="off" style="flex:1;min-width:180px"><button class="btn small" id="iaSave">Guardar clave</button>${p.iaActiva ? '<button class="btn small danger" id="iaDel">Quitar</button>' : ''}</div>`;
+  $('#iaSave').onclick = e => act(e.target, async () => { if (!$('#iaKey').value.trim()) return toast('Pega la clave primero.'); await call('configIA', { clave: $('#iaKey').value }); toast('Clave guardada'); pintarIA(); });
+  if ($('#iaDel')) $('#iaDel').onclick = e => act(e.target, async () => { await call('configIA', { quitar: true }); pintarIA(); });
+}
+
+/* ======================= Archivos ======================= */
+function aBase64(blob) { return new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = ko; r.readAsDataURL(blob); }); }
+async function subirArchivo(file, meta, alAvanzar) {
+  if (!file.size) throw new Error('El archivo «' + file.name + '» está vacío.');
+  const ini = await call('subirInicio', Object.assign({}, meta, { nombre: file.name, mime: file.type || 'application/octet-stream', tamano: file.size }));
+  const PARTE = 4 * 1024 * 1024;
+  for (let off = 0; off < file.size; off += PARTE) {
+    const b64 = await aBase64(file.slice(off, off + PARTE));
+    let r, intentos = 0;
+    while (true) { try { r = await call('subirParte', { subidaId: ini.subidaId, b64, inicio: off, total: file.size }); break; } catch (e) { if (++intentos >= 3 || e.message === 'SESION') throw e; await new Promise(z => setTimeout(z, 1500 * intentos)); } }
+    alAvanzar && alAvanzar(Math.min(1, (off + PARTE) / file.size));
+    if (r.listo) return { id: r.id, nombre: file.name, mime: file.type, tamano: file.size };
+  }
+  throw new Error('La subida no terminó. Inténtalo otra vez.');
+}
+async function subirVarios(files, meta, cont) {
+  const out = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    cont.innerHTML = `<p class="small">Subiendo ${i + 1} de ${files.length}: ${esc(f.name)} (${fTam(f.size)})</p><div class="prog"><i style="width:0%"></i></div>`;
+    out.push(await subirArchivo(f, meta, p => { const b = cont.querySelector('.prog i'); if (b) b.style.width = Math.round(p * 100) + '%'; }));
+  }
+  cont.innerHTML = '';
+  return out;
+}
+function descargarB64(nombre, b64, mime) {
+  const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([u8], { type: mime || 'application/octet-stream' }));
+  const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return url;
+}
+
+/* ======================= Detector de pegado ======================= */
+function vigilar(ta, metricas) {
+  let ultimo = 0;
+  const tick = () => { const n = Date.now(); if (ultimo && n - ultimo < 30000) metricas.ms += n - ultimo; ultimo = n; };
+  ta.addEventListener('paste', e => { const t = (e.clipboardData || window.clipboardData); const s = t ? t.getData('text') : ''; metricas.pegado += s.length; metricas.pegados++; tick(); });
+  ta.addEventListener('drop', e => { const s = e.dataTransfer ? e.dataTransfer.getData('text') : ''; metricas.pegado += s.length; metricas.pegados++; });
+  ta.addEventListener('beforeinput', e => { if (e.inputType === 'insertText' || e.inputType === 'insertCompositionText') metricas.tecleado += (e.data || '').length; if (e.inputType && e.inputType.indexOf('delete') === 0) metricas.borrados++; tick(); });
+}
+
+/* ======================= Estudiante ======================= */
+VISTAS.eInicio = async app => {
+  app.innerHTML = cabecera('Hola, ' + S.user.nombres.split(' ')[0]) + '<div class="spinner">Cargando tus aulas…</div>';
+  const aulas = await call('misAulas');
+  app.innerHTML = cabecera('Hola, ' + S.user.nombres.split(' ')[0], false, 'Tus aulas') +
+    `<div class="list">${aulas.map(a => `<button class="item" onclick="ir('aula',{id:'${a.id}'})"><span class="ico">${esc(a.nombre.slice(0, 2).toUpperCase())}</span><span class="grow"><b>${esc(a.nombre)}</b><span class="muted small">${esc(a.sede)}</span></span><span aria-hidden="true">›</span></button>`).join('') || '<div class="empty">Todavía no estás en ningún aula.</div>'}</div>
+    <form class="card" id="fUnir"><b>Unirme a un aula</b><div class="row"><input id="uCod" placeholder="Código del aula" style="flex:1;min-width:160px;text-transform:uppercase" autocomplete="off"><button class="btn primary" type="submit">Unirme</button></div></form>`;
+  $('#fUnir').onsubmit = e => { e.preventDefault(); act(e.submitter, async () => { const a = await call('unirme', { codigo: $('#uCod').value }); toast('Te uniste a ' + a.nombre); pintar(); }); };
+};
+VISTAS.aula = async (app, p) => {
+  app.innerHTML = cabecera('Aula', true) + '<div class="spinner">Cargando…</div>';
+  const a = await call('aula', { aulaId: p.id }), prof = S.user.rol === 'profesor';
+  const tabs = prof ? [['tareas', 'Tareas'], ['material', 'Material'], ['estudiantes', 'Estudiantes'], ['notas', 'Notas']] : [['tareas', 'Tareas'], ['material', 'Material'], ['notas', 'Mis notas']];
+  const tab = S.tab[a.id] || 'tareas';
+  let h = cabecera(a.nombre, true, esc(a.sede) + (prof ? ` · Código: <b>${esc(a.codigo)}</b>` : ''));
+  h += `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" onclick="S.tab['${a.id}']='${k}';pintar()">${l}</button>`).join('')}</div><div id="tabBody"></div>`;
+  app.innerHTML = h;
+  const body = $('#tabBody');
+  if (tab === 'tareas') {
+    body.innerHTML = (prof ? `<div class="row" style="margin-bottom:12px"><button class="btn primary" onclick="ir('pTareaForm',{aulaId:'${a.id}'})">+ Nueva tarea o examen</button>${a.carpeta ? `<a class="btn small" href="${a.carpeta}" target="_blank" rel="noopener">Carpeta en Drive</a>` : ''}</div>` : '') +
+      `<div class="list">${a.tareas.map(t => {
+        const estado = prof ? (t.porRevisar ? `<span class="pill warn">${t.porRevisar} por revisar</span>` : `<span class="pill info">${t.entregas} entregas</span>`)
+          : t.nota !== null && t.nota !== undefined ? `<span class="pill ok">${t.nota}/${t.notaMaxima}</span>` : t.entregada ? '<span class="pill info">Entregada</span>' : (t.tipo === 'parcial' || t.tipo === 'final') ? '<span class="pill info">Examen</span>' : t.fechaLimite && t.fechaLimite < Date.now() ? '<span class="pill bad">Vencida</span>' : '<span class="pill warn">Pendiente</span>';
+        return `<button class="item" onclick="ir('${prof ? 'pRevision' : 'eTarea'}',{id:'${t.id}'})"><span class="ico">${ICONOS[t.tipo] || '•'}</span><span class="grow"><b>${esc(t.titulo)}</b><span class="muted small">${TIPOS[t.tipo]}${t.fechaLimite ? ' · hasta ' + fFecha(t.fechaLimite) : ''}</span></span>${estado}</button>`;
+      }).join('') || '<div class="empty">Aún no hay tareas.</div>'}</div>`;
+  } else if (tab === 'material') {
+    body.innerHTML = (prof ? `<div class="card" style="margin-bottom:12px"><b>Subir material</b><label class="f">Título<input id="mTit" placeholder="Ej.: Semana 3 – Lectura"></label><input id="mFile" type="file" multiple accept=".pdf,image/*,video/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx"><div id="mProg"></div><button class="btn primary" id="mSubir">Subir</button></div>` : '') +
+      `<div class="list">${a.materiales.map(m => `<div class="item"><span class="ico">${m.mime && m.mime.indexOf('pdf') >= 0 ? 'PDF' : '▤'}</span><span class="grow"><b>${esc(m.titulo)}</b><span class="muted small">${esc(m.archivo)} · ${fTam(m.tamano)} · ${fDia(m.fecha)}</span></span>${prof ? `<a class="btn small" href="https://drive.google.com/file/d/${m.fileId}/view" target="_blank" rel="noopener">Ver</a><button class="btn small danger" onclick="borrarMaterial('${m.id}')" aria-label="Borrar">✕</button>` : `<button class="btn small" onclick="abrirMaterial('${m.id}',this)">Abrir</button>`}</div>`).join('') || '<div class="empty">Aún no hay material.</div>'}</div>`;
+    if (prof) $('#mSubir').onclick = e => act(e.target, async () => {
+      const fs = [...$('#mFile').files]; if (!fs.length) return toast('Elige uno o más archivos.');
+      const subidos = await subirVarios(fs, { destino: 'material', aulaId: a.id }, $('#mProg'));
+      for (const f of subidos) await call('guardarMaterial', { aulaId: a.id, titulo: fs.length === 1 && $('#mTit').value.trim() ? $('#mTit').value.trim() : f.nombre.replace(/\.[^.]+$/, ''), fileId: f.id, archivo: f.nombre, mime: f.mime, tamano: f.tamano });
+      toast('Material subido'); pintar();
+    });
+  } else if (tab === 'estudiantes') {
+    const est = await call('estudiantes', { aulaId: a.id });
+    body.innerHTML = `<form class="card" id="fMat" style="margin-bottom:12px"><b>Agregar estudiante por DNI</b><p class="muted small">Debe tener cuenta. También pueden unirse solos con el código <b>${esc(a.codigo)}</b>.</p><div class="row"><input id="maDni" inputmode="numeric" placeholder="DNI" style="flex:1;min-width:140px"><button class="btn" type="submit">Agregar</button></div></form>
+      <p class="muted small" style="margin:0 0 8px">${est.length} estudiantes</p>
+      <div class="list">${est.map(s => `<div class="item"><span class="grow"><b>${esc(s.nombre)}</b><span class="muted small">DNI ${esc(s.dni)} · ${hace(s.ultimoAcceso)} · ${fMin(s.minutos)} conectado</span></span><button class="btn small" onclick="ir('pEstudiante',{id:'${s.id}'})">Ver</button><button class="btn small danger" onclick="retirar('${a.id}','${s.id}','${esc(s.nombre).replace(/'/g, '')}')">Retirar</button></div>`).join('') || '<div class="empty">Aún no hay estudiantes.</div>'}</div>`;
+    $('#fMat').onsubmit = e => { e.preventDefault(); act(e.submitter, async () => { const r = await call('matricular', { aulaId: a.id, dni: $('#maDni').value }); toast(r.nombre + ' agregado'); pintar(); }); };
+  } else if (tab === 'notas') {
+    if (prof) { await pintarMatriz(body, a); return; }
+    const notas = (await call('misNotas')).find(n => n.aulaId === a.id);
+    body.innerHTML = notas ? bloqueNotas(notas) : '<div class="empty">Sin notas todavía.</div>';
+  }
+};
+async function abrirMaterial(id, btn) {
+  await act(btn, async () => {
+    const r = await call('verMaterial', { id });
+    const bin = atob(r.b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([u8], { type: r.mime }));
+    const w = window.open(url, '_blank');
+    if (!w) { const a = document.createElement('a'); a.href = url; a.download = r.nombre; document.body.appendChild(a); a.click(); a.remove(); }
+  });
+}
+async function borrarMaterial(id) { if (await preguntar('¿Borrar este material? También se moverá a la papelera de tu Drive.', 'Borrar')) act(null, async () => { await call('borrarMaterial', { id }); pintar(); }); }
+async function retirar(aulaId, userId, nombre) { if (await preguntar('¿Retirar a ' + esc(nombre) + ' de esta aula? Ya no podrá entrar a ella. Sus notas se conservan.', 'Retirar')) act(null, async () => { await call('retirar', { aulaId, userId }); toast('Estudiante retirado'); pintar(); }); }
+
+function grafico(items, max) {
+  const pts = items.filter(i => i.nota !== null && i.nota !== undefined).map(i => i.nota / i.notaMaxima * max);
+  if (pts.length < 2) return '';
+  const W = 320, H = 120, px = i => 20 + i * (W - 40) / (pts.length - 1), py = v => H - 18 - v / max * (H - 34);
+  const aprob = max * 0.55;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución de tus notas"><line x1="20" x2="${W - 20}" y1="${py(aprob)}" y2="${py(aprob)}" stroke="var(--line)" stroke-dasharray="4 4"/><text x="${W - 20}" y="${py(aprob) - 4}" text-anchor="end" font-size="10" fill="var(--muted)">aprobado ${Math.round(aprob * 10) / 10}</text>
+    <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="${pts.map((v, i) => px(i) + ',' + py(v)).join(' ')}"/>${pts.map((v, i) => `<circle cx="${px(i)}" cy="${py(v)}" r="${i === pts.length - 1 ? 5 : 3.5}" fill="${v >= aprob ? 'var(--accent)' : 'var(--bad)'}"/>`).join('')}
+    <text x="${px(pts.length - 1)}" y="${py(pts[pts.length - 1]) - 9}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--fg)">${Math.round(pts[pts.length - 1] * 10) / 10}</text></svg>`;
+}
+function bloqueNotas(n) {
+  const max = S.cfg.notaMaxima, prom = n.promedio;
+  return `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(n.aula)}</b><p class="muted small">${esc(n.sede)}</p></div><div style="text-align:right"><span class="muted small">Promedio</span><div style="font-size:1.6rem;font-weight:800;color:${prom === null ? 'var(--muted)' : prom >= max * 0.55 ? 'var(--ok)' : 'var(--bad)'}">${prom === null ? '—' : prom}</div></div></div>
+    ${grafico(n.items, max)}
+    <div class="tbl"><table><thead><tr><th>Actividad</th><th class="num">Nota</th></tr></thead><tbody>${n.items.map(i => `<tr><td style="white-space:normal">${esc(i.titulo)}<div class="muted small">${TIPOS[i.tipo]}${i.peso !== 1 ? ' · peso ' + i.peso : ''}${i.comentario ? ' · «' + esc(i.comentario) + '»' : ''}</div></td><td class="num">${i.nota === null || i.nota === undefined ? '<span class="muted">—</span>' : `<b>${i.nota}</b>/${i.notaMaxima}`}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+VISTAS.eNotas = async app => {
+  app.innerHTML = cabecera('Mis notas') + '<div class="spinner">Cargando…</div>';
+  const ns = await call('misNotas');
+  app.innerHTML = cabecera('Mis notas', false, 'Tu avance en cada aula') + (ns.map(bloqueNotas).join('<div style="height:12px"></div>') || '<div class="empty">Sin notas todavía.</div>');
+};
+VISTAS.eTarea = async (app, p) => {
+  app.innerHTML = cabecera('Tarea', true) + '<div class="spinner">Cargando…</div>';
+  const t = await call('tarea', { tareaId: p.id }), e = t.miEntrega, vencida = t.fechaLimite && Date.now() > t.fechaLimite;
+  const puedeEditar = !(e && e.revisada) && !vencida && t.tipo !== 'parcial' && t.tipo !== 'final' && !S.user.imp;
+  let h = cabecera(t.titulo, true, TIPOS[t.tipo] + (t.fechaLimite ? ' · hasta ' + fFecha(t.fechaLimite) : '') + ' · nota sobre ' + t.notaMaxima);
+  if (t.consigna) h += `<div class="card" style="margin-bottom:12px"><div class="answer" style="background:none;border:0;padding:0">${esc(t.consigna)}</div></div>`;
+  if (e && e.revisada) h += `<div class="note" style="margin-bottom:12px"><b>Nota: ${e.nota}/${t.notaMaxima}</b>${e.comentario ? '<br>Comentario de tu profesor: ' + esc(e.comentario) : ''}</div>`;
+  if (t.tipo === 'parcial' || t.tipo === 'final') { h += e && e.revisada ? '' : '<div class="empty">Tu profesor registrará aquí la nota de tu examen.</div>'; app.innerHTML = h; return; }
+  if (e && !puedeEditar) {
+    h += `<div class="card"><b>Tu entrega</b><span class="muted small">Enviada ${fFecha(e.fecha)}</span>${e.texto ? `<div class="answer">${esc(e.texto)}</div>` : ''}${respuestasHtml(t, e.respuestas)}${e.archivos.length ? `<div class="files">${e.archivos.map(f => `<span>📎 ${esc(f.nombre)} <span class="muted small">${fTam(f.tamano)}</span></span>`).join('')}</div>` : ''}</div>`;
+    app.innerHTML = h; return;
+  }
+  if (vencida && !e) { app.innerHTML = h + '<div class="note bad">La fecha límite ya pasó.</div>'; return; }
+  const metricas = { pegado: 0, pegados: 0, tecleado: 0, borrados: 0, ms: 0 };
+  if (e) h += `<div class="note" style="margin-bottom:12px">✓ Entregado el ${fFecha(e.fecha)}. Puedes corregirlo hasta que tu profesor lo revise${t.fechaLimite ? ' o venza el plazo' : ''}.</div>`;
+  h += `<form class="card" id="fEnt">`;
+  if (t.tipo === 'foro') h += `<label class="f">Tu respuesta<textarea id="eTxt" placeholder="Escribe aquí con tus propias palabras…">${esc(e ? e.texto : '')}</textarea></label><p class="muted small">🔒 Solo tu profesor verá tu respuesta.</p>`;
+  if (t.tipo === 'formulario') h += t.preguntas.map((q, i) => `<div class="q"><b>${i + 1}. ${esc(q.texto)}</b>${q.tipo === 'opcion' ? q.opciones.map((o, j) => `<label class="opt"><input type="radio" name="q_${q.id}" value="${j}" ${e && String(e.respuestas[q.id]) === String(j) ? 'checked' : ''}> ${esc(o)}</label>`).join('') : `<textarea data-q="${q.id}" style="min-height:110px">${esc(e && e.respuestas[q.id] || '')}</textarea>`}</div>`).join('');
+  if (t.tipo === 'archivo') h += `${e && e.archivos.length ? `<div class="files">${e.archivos.map(f => `<span>📎 ${esc(f.nombre)}</span>`).join('')}</div>` : ''}<label class="f">Archivos, fotos o videos<input id="eFiles" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip"></label><label class="f">Comentario (opcional)<textarea id="eTxt" style="min-height:90px">${esc(e ? e.texto : '')}</textarea></label><p class="muted small">🔒 Solo tu profesor puede ver lo que subes. Los videos largos pueden tardar.</p><div id="eProg"></div>`;
+  h += `<button class="btn primary block" type="submit">${e ? 'Actualizar entrega' : 'Enviar'}</button></form>`;
+  app.innerHTML = h;
+  document.querySelectorAll('#fEnt textarea').forEach(ta => vigilar(ta, metricas));
+  $('#fEnt').onsubmit = ev => {
+    ev.preventDefault();
+    act(ev.submitter, async () => {
+      const datos = { tareaId: t.id, metricas, texto: $('#eTxt') ? $('#eTxt').value : '', respuestas: {}, archivos: [] };
+      if (t.tipo === 'formulario') {
+        t.preguntas.forEach(q => { if (q.tipo === 'opcion') { const r = document.querySelector(`input[name="q_${q.id}"]:checked`); if (r) datos.respuestas[q.id] = r.value; } else datos.respuestas[q.id] = document.querySelector(`textarea[data-q="${q.id}"]`).value; });
+        const faltan = t.preguntas.filter(q => datos.respuestas[q.id] === undefined || datos.respuestas[q.id] === '').length;
+        if (faltan && !(await preguntar(`Te faltan ${faltan} pregunta(s). ¿Enviar de todas formas?`, 'Enviar'))) return;
+      }
+      if (t.tipo === 'archivo') { const fs = [...$('#eFiles').files]; if (fs.length) datos.archivos = await subirVarios(fs, { destino: 'entrega', tareaId: t.id }, $('#eProg')); }
+      const r = await call('entregar', datos);
+      toast(r.nota !== null ? 'Enviado. Tu nota: ' + r.nota : 'Enviado'); pintar();
+    });
+  };
+};
+function respuestasHtml(t, resp) {
+  if (t.tipo !== 'formulario' || !resp) return '';
+  return t.preguntas.map((q, i) => `<div class="q"><b>${i + 1}. ${esc(q.texto)}</b>${q.tipo === 'opcion' ? `<span>${resp[q.id] !== undefined && q.opciones[resp[q.id]] !== undefined ? esc(q.opciones[resp[q.id]]) : '<span class="muted">Sin responder</span>'}${q.correcta !== undefined && q.correcta !== '' && resp[q.id] !== undefined ? (String(resp[q.id]) === String(q.correcta) ? ' <span class="pill ok">Correcta</span>' : ' <span class="pill bad">Incorrecta</span>') : ''}</span>` : `<div class="answer">${esc(resp[q.id] || '—')}</div>`}</div>`).join('');
+}
+
+/* ======================= Profesor ======================= */
+VISTAS.pInicio = async app => {
+  app.innerHTML = cabecera('Panel') + '<div class="spinner">Cargando…</div>';
+  const p = await call('panel');
+  app.innerHTML = cabecera('Hola, profe ' + S.user.nombres.split(' ')[0], false, esc(S.cfg.nombre)) +
+    `<div class="stats"><div class="stat"><b>${p.estudiantes}</b><span>Estudiantes</span></div><div class="stat"><b>${p.porRevisar}</b><span>Por revisar</span></div><button class="stat" style="text-align:left;font:inherit;color:inherit" onclick="S.filtroEst='inactivos';raiz('pEstudiantes')"><b>${p.sinEntrar7}</b><span>Sin entrar hace 7+ días ›</span></button><button class="stat" style="text-align:left;font:inherit;color:inherit" onclick="S.filtroEst='nunca';raiz('pEstudiantes')"><b>${p.nuncaEntraron}</b><span>Nunca entraron ›</span></button></div>
+    <div class="sect"><h2>Sedes y aulas</h2><button class="btn small primary" onclick="formSede()">+ Sede</button></div>
+    ${p.sedes.map(s => `<div class="card" style="margin-bottom:12px"><div class="row" style="justify-content:space-between"><div><b>${esc(s.nombre)}</b>${s.direccion ? `<p class="muted small">${esc(s.direccion)}</p>` : ''}</div><div class="row"><button class="btn small" onclick='formSede(${JSON.stringify(s).replace(/'/g, "&#39;")})'>Editar</button><button class="btn small primary" onclick="formAula('${s.id}')">+ Aula</button></div></div>
+      ${s.aulas.map(a => `<button class="item" onclick="ir('aula',{id:'${a.id}'})"><span class="ico">${esc(a.nombre.slice(0, 2).toUpperCase())}</span><span class="grow"><b>${esc(a.nombre)}</b><span class="muted small">${a.estudiantes} estudiantes · código ${esc(a.codigo)}</span></span>${a.porRevisar ? `<span class="pill warn">${a.porRevisar}</span>` : ''}</button>`).join('') || '<p class="muted small">Sin aulas todavía.</p>'}</div>`).join('') || '<div class="empty">Crea tu primera sede para empezar.</div>'}`;
+};
+function formSede(s) {
+  s = s || {};
+  modal(`<h2>${s.id ? 'Editar sede' : 'Nueva sede'}</h2><form id="fSede" style="display:grid;gap:10px"><label class="f">Nombre<input id="sNom" value="${esc(s.nombre || '')}" placeholder="Ej.: Sede Centro" required></label><label class="f">Dirección (opcional)<input id="sDir" value="${esc(s.direccion || '')}"></label><div class="row"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" onclick="cerrarModal()">Cancelar</button></div></form>`);
+  $('#fSede').onsubmit = e => { e.preventDefault(); act(e.submitter, async () => { await call('guardarSede', { id: s.id, nombre: $('#sNom').value, direccion: $('#sDir').value }); cerrarModal(); toast('Sede guardada'); pintar(); }); };
+}
+function formAula(sedeId) {
+  modal(`<h2>Nueva aula</h2><form id="fAula" style="display:grid;gap:10px"><label class="f">Nombre<input id="aNom" placeholder="Ej.: Matemática I – Turno noche" required></label><label class="f">Descripción (opcional)<input id="aDes"></label><div class="row"><button class="btn primary" type="submit">Crear aula</button><button class="btn" type="button" onclick="cerrarModal()">Cancelar</button></div></form>`);
+  $('#fAula').onsubmit = e => { e.preventDefault(); act(e.submitter, async () => { const a = await call('guardarAula', { sedeId, nombre: $('#aNom').value, descripcion: $('#aDes').value }); cerrarModal(); toast('Aula creada. Código: ' + a.codigo); pintar(); }); };
+}
+VISTAS.pTareaForm = async (app, p) => {
+  const t = p.id ? await call('tarea', { tareaId: p.id }) : { tipo: 'foro', titulo: '', consigna: '', notaMaxima: S.cfg.notaMaxima, peso: 1, preguntas: [] };
+  let preguntas = (t.preguntas || []).map(q => Object.assign({}, q));
+  const fl = t.fechaLimite ? new Date(t.fechaLimite - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
+  app.innerHTML = cabecera(p.id ? 'Editar' : 'Nueva tarea o examen', true) + `<form class="card" id="fTar">
+    <label class="f">Tipo<select id="tTipo">${Object.keys(TIPOS).map(k => `<option value="${k}" ${t.tipo === k ? 'selected' : ''}>${TIPOS[k]}</option>`).join('')}</select></label>
+    <p class="muted small" id="tAyuda"></p>
+    <label class="f">Título<input id="tTit" value="${esc(t.titulo)}" required></label>
+    <label class="f">Consigna o tema<textarea id="tCon" style="min-height:120px">${esc(t.consigna)}</textarea></label>
+    <div class="row"><label class="f" style="flex:1;min-width:150px">Fecha límite<input id="tFec" type="datetime-local" value="${fl}"></label><label class="f" style="width:110px">Nota sobre<input id="tMax" type="number" min="1" max="100" value="${t.notaMaxima}"></label><label class="f" style="width:90px">Peso<input id="tPeso" type="number" min="0.1" step="0.1" value="${t.peso}"></label></div>
+    <div id="tPreg"></div>
+    <div class="row"><button class="btn primary" type="submit">Guardar</button>${p.id ? '<button class="btn danger" type="button" id="tBorrar">Borrar</button>' : ''}</div></form>`;
+  const ayudas = { foro: 'Los estudiantes escriben su comentario sobre el tema. Nadie ve el comentario de otro. Se detecta si pegaron el texto, si se parece al de un compañero y si pudo hacerse con IA.', archivo: 'Suben archivos, fotos o videos. Se guardan en tu Drive en la carpeta de cada estudiante.', formulario: 'Preguntas de opción múltiple (se califican solas) o abiertas.', parcial: 'Tú subes la foto del examen de cada estudiante y le pones nota.', final: 'Tú subes la foto del examen de cada estudiante y le pones nota.' };
+  const pintarPreg = () => {
+    const tipo = $('#tTipo').value; $('#tAyuda').textContent = ayudas[tipo];
+    $('#tFec').closest('label').hidden = tipo === 'parcial' || tipo === 'final';
+    const c = $('#tPreg'); if (tipo !== 'formulario') { c.innerHTML = ''; return; }
+    c.innerHTML = `<b>Preguntas</b>` + preguntas.map((q, i) => `<div class="q" data-i="${i}"><div class="row"><select class="qTipo" style="width:auto"><option value="opcion" ${q.tipo === 'opcion' ? 'selected' : ''}>Opción múltiple</option><option value="abierta" ${q.tipo === 'abierta' ? 'selected' : ''}>Abierta</option></select><input class="qPts" type="number" min="0.5" step="0.5" value="${q.puntos || 1}" style="width:90px" aria-label="Puntos"><button type="button" class="btn small danger qDel">Quitar</button></div><input class="qTxt" placeholder="Pregunta" value="${esc(q.texto || '')}">${q.tipo === 'opcion' ? `<textarea class="qOps" style="min-height:90px" placeholder="Una opción por línea">${esc((q.opciones || []).join('\n'))}</textarea><label class="f">N.º de la opción correcta<input class="qCor" type="number" min="1" value="${(Number(q.correcta) || 0) + 1}" style="width:90px"></label>` : ''}</div>`).join('') + `<button type="button" class="btn small" id="qAdd">+ Pregunta</button>`;
+    const leer = () => { c.querySelectorAll('.q').forEach(el => { const q = preguntas[+el.dataset.i]; q.tipo = el.querySelector('.qTipo').value; q.texto = el.querySelector('.qTxt').value; q.puntos = +el.querySelector('.qPts').value || 1; const o = el.querySelector('.qOps'); if (o) q.opciones = o.value.split('\n').map(s => s.trim()).filter(Boolean); const k = el.querySelector('.qCor'); if (k) q.correcta = Math.max(0, (+k.value || 1) - 1); }); };
+    c.querySelectorAll('.qTipo').forEach(s => s.onchange = () => { leer(); pintarPreg(); });
+    c.querySelectorAll('.qDel').forEach(b => b.onclick = () => { leer(); preguntas.splice(+b.closest('.q').dataset.i, 1); pintarPreg(); });
+    $('#qAdd').onclick = () => { leer(); preguntas.push({ tipo: 'opcion', texto: '', opciones: [], correcta: 0, puntos: 1 }); pintarPreg(); };
+    c.leer = leer;
+  };
+  $('#tTipo').onchange = pintarPreg; pintarPreg();
+  $('#fTar').onsubmit = e => { e.preventDefault(); if ($('#tPreg').leer) $('#tPreg').leer(); act(e.submitter, async () => {
+    const tipo = $('#tTipo').value;
+    await call('guardarTarea', { id: p.id, aulaId: p.aulaId || t.aulaId, tipo, titulo: $('#tTit').value, consigna: $('#tCon').value, fechaLimite: $('#tFec').value && tipo !== 'parcial' && tipo !== 'final' ? new Date($('#tFec').value).getTime() : '', notaMaxima: $('#tMax').value, peso: $('#tPeso').value, preguntas });
+    toast('Guardado'); atras();
+  }); };
+  if ($('#tBorrar')) $('#tBorrar').onclick = async () => { if (await preguntar('¿Borrar esta tarea y todas sus entregas y notas? Los archivos se quedan en tu Drive.', 'Borrar')) act(null, async () => { await call('borrarTarea', { id: p.id }); S.stack.pop(); atras(); }); };
+};
+VISTAS.pRevision = async (app, p) => {
+  app.innerHTML = cabecera('Revisión', true) + '<div class="spinner">Cargando…</div>';
+  const r = await call('entregas', { tareaId: p.id }), t = r.tarea, examen = t.tipo === 'parcial' || t.tipo === 'final';
+  const conAlertas = r.filas.filter(f => f.alertas.length).length, entregadas = r.filas.filter(f => f.tiene || f.nota !== null).length;
+  let h = cabecera(t.titulo, true, TIPOS[t.tipo] + ` · ${entregadas} de ${r.filas.length}` + (examen ? ' con nota' : ' entregaron'));
+  h += `<div class="row" style="margin-bottom:12px"><button class="btn small" onclick="ir('pTareaForm',{id:'${t.id}',aulaId:'${t.aulaId}'})">Editar</button>${!examen && t.tipo !== 'archivo' ? '<button class="btn small primary" id="bAnal">Revisar copia e IA</button>' : ''}</div>`;
+  if (!examen && t.tipo !== 'archivo') h += `<div class="note ${conAlertas ? 'warn' : ''}" style="margin-bottom:12px">${conAlertas ? `<b>${conAlertas} entrega(s) con alertas.</b> ` : ''}Las alertas son indicios para que revises: texto pegado, escrito demasiado rápido, parecido con un compañero o posible uso de IA. No son pruebas.</div>`;
+  if (examen) h += `<div class="note" style="margin-bottom:12px">Toca a cada estudiante para subir la foto de su examen y ponerle nota.</div>`;
+  h += `<div class="list">${r.filas.map(f => `<button class="item" onclick="ir('pEntrega',{tareaId:'${t.id}',userId:'${f.userId}'})"><span class="grow"><b>${esc(f.nombre)}</b><span class="muted small">${f.tiene ? 'Entregó ' + fFecha(f.fecha) : examen ? 'Sin foto del examen' : 'No entregó'}</span>${f.alertas.length ? `<span class="row" style="margin-top:4px">${f.alertas.map(a => `<span class="pill ${a.nivel === 'alto' ? 'bad' : 'warn'}">${esc(a.texto)}</span>`).join('')}</span>` : ''}</span>${f.nota !== null ? `<span class="pill ok">${f.nota}/${t.notaMaxima}</span>` : f.tiene ? '<span class="pill warn">Por calificar</span>' : ''}</button>`).join('') || '<div class="empty">No hay estudiantes en esta aula.</div>'}</div>`;
+  app.innerHTML = h;
+  if ($('#bAnal')) $('#bAnal').onclick = e => act(e.target, async () => {
+    let res = await call('analizarTarea', { tareaId: t.id });
+    let vueltas = 0; while (res.pendientesIA && vueltas++ < 20) { e.target.textContent = 'Revisando con IA… faltan ' + res.pendientesIA; res = await call('analizarTarea', { tareaId: t.id }); }
+    toast(res.analizadas ? `Revisadas ${res.analizadas} respuestas` : 'No hay respuestas con texto suficiente'); pintar();
+  });
+};
+VISTAS.pEntrega = async (app, p) => {
+  app.innerHTML = cabecera('Entrega', true) + '<div class="spinner">Cargando…</div>';
+  const r = await call('entrega', p), t = r.tarea, e = r.entrega, examen = t.tipo === 'parcial' || t.tipo === 'final';
+  let h = cabecera(r.estudiante.nombre, true, esc(t.titulo) + ' · DNI ' + esc(r.estudiante.dni));
+  if (e && (e.texto || e.archivos.length || Object.keys(e.respuestas || {}).length)) {
+    h += `<div class="card" style="margin-bottom:12px"><span class="muted small">Enviado ${fFecha(e.fecha)}</span>${e.texto ? `<div class="answer">${esc(e.texto)}</div>` : ''}${respuestasHtml(t, e.respuestas)}${e.archivos.length ? `<div class="files">${e.archivos.map(f => `<a href="${f.url}" target="_blank" rel="noopener">📎 ${esc(f.nombre)} <span class="muted small">${fTam(f.tamano)}</span></a>`).join('')}</div>` : ''}</div>`;
+    const m = e.metricas || {}, an = e.analisis || {}, largo = (e.texto || '').length;
+    if (!examen && (largo || an.similitud !== undefined)) {
+      const pegPct = largo && m.pegado ? Math.min(100, Math.round(m.pegado / largo * 100)) : 0, vel = m.ms ? Math.round(largo / (m.ms / 60000)) : 0;
+      h += `<div class="card" style="margin-bottom:12px"><b>Revisión de originalidad</b>
+        <div class="row"><span class="pill ${pegPct >= 70 ? 'bad' : pegPct >= 30 ? 'warn' : 'ok'}">Pegado: ${pegPct}%</span>${m.pegados ? `<span class="muted small">${m.pegados} vez(es)</span>` : ''}${m.ms ? `<span class="muted small">Tiempo escribiendo: ${Math.max(1, Math.round(m.ms / 60000))} min${vel ? ' · ' + vel + ' letras/min' : ''}</span>` : ''}</div>
+        ${an.similitud !== undefined ? `<div><span class="pill ${an.similitud >= 60 ? 'bad' : an.similitud >= 35 ? 'warn' : 'ok'}">Parecido con compañeros: ${an.similitud}%</span>${an.conQuien && an.similitud >= 15 ? ` <span class="small">con ${esc(an.conQuien)}</span>` : ''}${an.frases && an.frases.length && an.similitud >= 15 ? `<div class="muted small" style="margin-top:6px">Frases que coinciden: ${an.frases.map(f => '«…' + esc(f) + '…»').join(' ')}</div>` : ''}</div>` : '<p class="muted small">Toca «Revisar copia e IA» en la lista para comparar con los compañeros.</p>'}
+        ${an.ia ? `<div><span class="pill ${an.ia.nivel === 'alta' ? 'bad' : an.ia.nivel === 'media' ? 'warn' : 'ok'}">Posible IA: ${esc(an.ia.nivel)}</span> <span class="muted small">${an.ia.fuente === 'claude' ? 'revisado con Claude' : 'indicios locales'}</span><ul class="small" style="margin:6px 0 0;padding-left:18px">${(an.ia.razones || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+        <p class="muted small">Son indicios para que revises tú. Conversa con el estudiante antes de concluir.</p></div>`;
+    }
+  } else if (!examen) h += '<div class="note warn" style="margin-bottom:12px">Todavía no entregó.</div>';
+  h += `<form class="card" id="fCal"><b>${examen ? 'Examen y nota' : 'Calificación'}</b>
+    ${examen ? `<label class="f">Foto(s) del examen<input id="cFotos" type="file" accept="image/*,.pdf" multiple capture="environment"></label><div id="cProg"></div>` : ''}
+    <label class="f">Nota (sobre ${t.notaMaxima})<input id="cNota" type="number" step="0.1" min="0" max="${t.notaMaxima}" inputmode="decimal" value="${e && e.nota !== null ? e.nota : ''}"></label>
+    <label class="f">Comentario para el estudiante (opcional)<textarea id="cCom" style="min-height:90px">${esc(e ? e.comentario : '')}</textarea></label>
+    <button class="btn primary" type="submit">Guardar nota</button></form>`;
+  app.innerHTML = h;
+  $('#fCal').onsubmit = ev => { ev.preventDefault(); act(ev.submitter, async () => {
+    let archivos = [];
+    if (examen && $('#cFotos').files.length) archivos = await subirVarios([...$('#cFotos').files], { destino: 'entrega', tareaId: t.id, userId: r.estudiante.id }, $('#cProg'));
+    await call('calificar', { tareaId: t.id, userId: r.estudiante.id, nota: $('#cNota').value, comentario: $('#cCom').value, archivos });
+    toast('Nota guardada'); atras();
+  }); };
+};
+async function pintarMatriz(body, a) {
+  body.innerHTML = '<div class="spinner">Cargando notas…</div>';
+  const m = await call('notasAula', { aulaId: a.id }), max = S.cfg.notaMaxima;
+  body.innerHTML = `<div class="row" style="margin-bottom:10px"><button class="btn small primary" onclick="exportar({aulaId:'${a.id}'},this)">Descargar Excel</button>${m.tasaEntrega !== null ? `<span class="muted small">Entregan el ${m.tasaEntrega}% de las tareas</span>` : ''}</div>
+    <div class="tbl"><table><thead><tr><th>Estudiante</th>${m.tareas.map(t => `<th class="num" title="${esc(t.titulo)}">${esc(t.titulo.slice(0, 14))}${t.titulo.length > 14 ? '…' : ''}<br><span style="font-weight:400">/${t.notaMaxima}${t.peso !== 1 ? ' ×' + t.peso : ''}</span></th>`).join('')}<th class="num">Promedio</th></tr></thead>
+    <tbody>${m.filas.map(f => `<tr><td><a href="#" onclick="ir('pEstudiante',{id:'${f.userId}'});return false" style="color:inherit">${esc(f.nombre)}</a></td>${f.notas.map(n => `<td class="num">${n === null ? '<span class="muted">—</span>' : n}</td>`).join('')}<td class="num"><b style="color:${f.promedio === null ? 'var(--muted)' : f.promedio >= max * 0.55 ? 'var(--ok)' : 'var(--bad)'}">${f.promedio === null ? '—' : f.promedio}</b></td></tr>`).join('') || `<tr><td colspan="${m.tareas.length + 2}" class="muted">Sin estudiantes.</td></tr>`}</tbody></table></div>`;
+}
+async function exportar(filtro, btn) {
+  await act(btn, async () => {
+    const r = await call('exportarNotas', filtro);
+    if (r.b64) descargarB64(r.nombre, r.b64, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    modal(`<h2>Reporte listo</h2><p>Se descargó <b>${esc(r.nombre)}</b> y también quedó guardado en tu Drive, en la carpeta «Reportes de notas».</p><div class="row"><a class="btn primary" href="${r.url}" target="_blank" rel="noopener">Abrir en Google Sheets</a><button class="btn" onclick="cerrarModal()">Cerrar</button></div>`);
+  });
+}
+VISTAS.pEstudiantes = async app => {
+  const filtro = S.filtroEst || 'todos';
+  app.innerHTML = cabecera('Estudiantes') + `<form id="fBus" class="row" style="margin-bottom:10px"><input id="bQ" type="search" placeholder="Buscar por nombre, DNI, correo o celular" value="${esc(S.busq || '')}" style="flex:1;min-width:200px" autocomplete="off"><button class="btn" type="submit">Buscar</button></form>
+    <div class="tabs">${[['todos', 'Todos'], ['inactivos', 'Sin entrar 7+ días'], ['nunca', 'Nunca entraron'], ['bloqueados', 'Desactivados']].map(([k, l]) => `<button aria-selected="${filtro === k}" onclick="S.filtroEst='${k}';pintar()">${l}</button>`).join('')}</div><div id="lEst"><div class="spinner">Cargando…</div></div>`;
+  $('#fBus').onsubmit = e => { e.preventDefault(); S.busq = $('#bQ').value; pintar(); };
+  let est = await call('estudiantes', { q: S.busq || '' });
+  const sem = 7 * 864e5;
+  if (filtro === 'inactivos') est = est.filter(s => s.ultimoAcceso && Date.now() - s.ultimoAcceso > sem);
+  if (filtro === 'nunca') est = est.filter(s => !s.ultimoAcceso || !s.minutos);
+  if (filtro === 'bloqueados') est = est.filter(s => s.estado === 'bloqueado');
+  $('#lEst').innerHTML = `<p class="muted small" style="margin:0 0 8px">${est.length} estudiante(s)</p><div class="list">${est.map(s => `<button class="item" onclick="ir('pEstudiante',{id:'${s.id}'})"><span class="grow"><b>${esc(s.nombre)}</b><span class="muted small">DNI ${esc(s.dni)} · ${esc(s.aulas.join(', ') || 'Sin aula')}</span></span><span style="text-align:right" class="small"><span class="pill ${!s.ultimoAcceso ? 'bad' : Date.now() - s.ultimoAcceso > sem ? 'warn' : 'ok'}">${hace(s.ultimoAcceso)}</span>${s.estado === 'bloqueado' ? '<br><span class="pill bad">Desactivado</span>' : ''}</span></button>`).join('') || '<div class="empty">No hay estudiantes con ese filtro.</div>'}</div>`;
+};
+VISTAS.pEstudiante = async (app, p) => {
+  app.innerHTML = cabecera('Estudiante', true) + '<div class="spinner">Cargando…</div>';
+  const r = await call('estudiante', { id: p.id }), d = r.datos;
+  app.innerHTML = cabecera(d.apellidos + ' ' + d.nombres, true, 'DNI ' + esc(d.dni)) +
+    `<div class="card" style="margin-bottom:12px">
+      <div class="row"><span class="pill ${!d.ultimoAcceso ? 'bad' : Date.now() - d.ultimoAcceso > 7 * 864e5 ? 'warn' : 'ok'}">${hace(d.ultimoAcceso)}</span><span class="muted small">Tiempo total conectado: ${fMin(d.minutos)}</span>${d.estado === 'bloqueado' ? '<span class="pill bad">Desactivado</span>' : ''}</div>
+      <div class="small">📱 ${esc(d.celular || '—')}<br>✉️ ${esc(d.correo || '—')}<br>Registrado: ${fFecha(d.creado)}</div>
+      <div class="row"><button class="btn small" id="bEditar">Editar datos</button><button class="btn small" id="bClave">Nueva contraseña</button><button class="btn small" id="bComo">Entrar como este estudiante</button><button class="btn small ${d.estado === 'bloqueado' ? '' : 'danger'}" id="bEstado">${d.estado === 'bloqueado' ? 'Reactivar cuenta' : 'Desactivar cuenta'}</button></div></div>
+    <div class="sect"><h2>Aulas</h2></div><div class="list">${r.matriculas.map(m => `<div class="item"><span class="grow"><b>${esc(m.aula)}</b><span class="muted small">${esc(m.sede)} · desde ${fDia(m.fecha)}</span></span>${m.estado === 'activo' ? `<button class="btn small danger" onclick="retirar('${m.aulaId}','${d.id}','${esc(d.nombres).replace(/'/g, '')}')">Retirar</button>` : '<span class="pill bad">Retirado</span>'}</div>`).join('') || '<div class="empty">No está en ningún aula.</div>'}</div>
+    <div class="sect"><h2>Récord de notas</h2></div>${r.notas.map(bloqueNotas).join('<div style="height:12px"></div>') || '<div class="empty">Sin notas.</div>'}`;
+  $('#bClave').onclick = () => {
+    const sug = 'Aula' + Math.floor(1000 + Math.random() * 9000);
+    modal(`<h2>Nueva contraseña</h2><p class="muted small">Por seguridad no se puede ver la contraseña actual. Pon una nueva y dásela al estudiante: al entrar, la app le pedirá cambiarla.</p><form id="fRc" style="display:grid;gap:10px"><input id="rcClave" value="${sug}" minlength="6" required><div class="row"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" onclick="cerrarModal()">Cancelar</button></div></form>`);
+    $('#fRc').onsubmit = e => { e.preventDefault(); act(e.submitter, async () => { const c = $('#rcClave').value; await call('restablecerClave', { id: d.id, clave: c }); modal(`<h2>Listo</h2><p>Nueva contraseña de ${esc(d.nombres)}:</p><p style="font-size:1.4rem;font-weight:800;user-select:all">${esc(c)}</p><p class="muted small">Entra con su DNI ${esc(d.dni)} y esta contraseña.</p><button class="btn primary" onclick="cerrarModal()">Entendido</button>`); }); };
+  };
+  $('#bEditar').onclick = () => {
+    modal(`<h2>Editar datos</h2><form id="fEd" style="display:grid;gap:10px"><label class="f">DNI<input id="edDni" value="${esc(d.dni)}"></label><label class="f">Nombres<input id="edNom" value="${esc(d.nombres)}"></label><label class="f">Apellidos<input id="edApe" value="${esc(d.apellidos)}"></label><label class="f">Celular<input id="edCel" value="${esc(d.celular)}"></label><label class="f">Correo<input id="edCor" value="${esc(d.correo)}"></label><div class="row"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" onclick="cerrarModal()">Cancelar</button></div></form>`);
+    $('#fEd').onsubmit = e => { e.preventDefault(); act(e.submitter, async () => { await call('editarEstudiante', { id: d.id, dni: $('#edDni').value, nombres: $('#edNom').value, apellidos: $('#edApe').value, celular: $('#edCel').value, correo: $('#edCor').value }); cerrarModal(); pintar(); }); };
+  };
+  $('#bComo').onclick = e => act(e.target, async () => { const res = await call('entrarComo', { id: d.id }); S.adminToken = S.token; S.adminUser = S.user; S.token = res.token; S.user = res.usuario; pintarImp(); raiz('eInicio'); });
+  $('#bEstado').onclick = async e => { const des = d.estado !== 'bloqueado'; if (!des || await preguntar('¿Desactivar la cuenta? No podrá entrar hasta que la reactives.', 'Desactivar')) act(e.target, async () => { await call('estadoCuenta', { id: d.id, estado: des ? 'bloqueado' : 'activo' }); pintar(); }); };
+};
+VISTAS.pComparativo = async app => {
+  app.innerHTML = cabecera('Notas y comparativos') + '<div class="spinner">Calculando…</div>';
+  const c = await call('comparativo'), max = S.cfg.notaMaxima;
+  const todas = c.flatMap(s => s.aulas.filter(a => a.promedio !== null));
+  const mejor = todas.slice().sort((a, b) => b.promedio - a.promedio)[0];
+  app.innerHTML = cabecera('Notas y comparativos', false, 'Promedios por sede y aula, sobre ' + max) +
+    `<div class="row" style="margin-bottom:14px"><button class="btn primary" onclick="exportar({},this)">Descargar Excel de todo</button></div>
+    ${mejor ? `<div class="note" style="margin-bottom:14px">Mejor promedio: <b>${esc(mejor.aula)}</b> con ${mejor.promedio}.</div>` : ''}
+    ${c.map(s => `<div class="card" style="margin-bottom:12px"><div class="row" style="justify-content:space-between"><b>${esc(s.sede)}</b>${s.aulas.length ? `<button class="btn small" onclick="exportar({sedeId:'${s.sedeId}'},this)">Excel de la sede</button>` : ''}</div>
+      ${s.aulas.map(a => `<button class="item" onclick="S.tab['${a.id}']='notas';ir('aula',{id:'${a.id}'})" style="display:grid;gap:6px"><span class="row" style="justify-content:space-between"><b>${esc(a.aula)}</b><span class="small"><b>${a.promedio === null ? '—' : a.promedio}</b></span></span>
+        <span class="prog" aria-hidden="true"><i style="width:${a.promedio === null ? 0 : a.promedio / max * 100}%;background:${a.promedio !== null && a.promedio < max * 0.55 ? 'var(--bad)' : 'var(--accent)'}"></i></span>
+        <span class="muted small">${a.estudiantes} estudiantes · ${a.aprobados} aprobados · ${a.desaprobados} desaprobados${a.entregas !== null ? ' · entregan ' + a.entregas + '%' : ''}</span></button>`).join('') || '<p class="muted small">Sin aulas.</p>'}</div>`).join('') || '<div class="empty">Aún no hay sedes.</div>'}`;
+};
+
+/* ======================= Arranque ======================= */
+(async function iniciar() {
+  try { S.cfg = await call('config'); } catch (e) {}
+  document.title = S.cfg.nombre;
+  const t = store.get('token');
+  if (t) { S.token = t; try { S.user = await call('yo'); pintarImp(); iniciarPing(); return raiz(S.user.debeCambiarClave ? 'forzarClave' : S.user.rol === 'profesor' ? 'pInicio' : 'eInicio'); } catch (e) { S.token = null; } }
+  raiz('login');
+})();
+const _entrar = entrar; entrar = r => { _entrar(r); iniciarPing(); };
+</script>
+</body>
+</html>
