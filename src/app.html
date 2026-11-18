@@ -104,6 +104,10 @@ select,input[type="text"]{font:500 14px var(--body);border:1px solid var(--line)
 .msg{max-width:88%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;line-height:1.5;min-width:0;overflow-wrap:anywhere}
 .msg.ai{background:var(--surface);border:1px solid var(--line);justify-self:start;border-bottom-left-radius:4px}
 .msg.me{background:var(--accent);color:var(--accent-ink);justify-self:end;border-bottom-right-radius:4px}
+.showchips{display:grid;gap:6px;margin-top:6px}
+.showchips small{color:var(--muted)}
+.msg .chatgal{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);white-space:normal}
+.msg.ai:has(.chatgal){max-width:100%;width:100%}
 .msg .acts{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:13px;color:var(--keep);font-weight:600}
 .thinking{color:var(--muted);animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.4}}
@@ -574,6 +578,8 @@ function aiTools(msg, onChange) {
       execute: i => { const c = (Array.isArray(i.carpetas) ? i.carpetas : []).map(x => String(x).trim().replace(/[\\/:*?"<>|]/g, '-')).filter(Boolean).slice(0, 15); if (!c.length) throw new Error('Lista vacía'); S.cats = [...new Set([...c, 'Otros'])]; store.set('cats', S.cats); if (i.contexto) { S.tata = String(i.contexto).slice(0, 400); store.set('tata', S.tata); } S.photos.forEach(p => { if (p.cat && !S.cats.includes(p.cat)) p.cat = null; }); msg.follow = 'classify'; log('Carpetas por tipo: ' + S.cats.join(', ')); return 'Listo. Se mostrará a la persona un botón para clasificar ahora.'; } },
     { name: 'preparar_exportacion', description: 'Elige cómo se organizarán las carpetas del .zip al exportar: tipo, evento, lugar, album o mes. Se mostrará a la persona un botón para exportar.', inputSchema: { type: 'object', properties: { por: { type: 'string', enum: ['tipo', 'evento', 'lugar', 'album', 'mes'] } }, required: ['por'] },
       execute: i => { if (!['tipo', 'evento', 'lugar', 'album', 'mes'].includes(i.por)) throw new Error('Opción no válida'); S.exportBy = i.por; msg.follow = 'export'; log('Exportación por ' + i.por); return 'Listo.'; } },
+    { name: 'mostrar_fotos', description: 'Muestra a la persona, dentro del chat, las miniaturas de las fotos o videos que cumplen los filtros, para que los vea y decida. Ella puede abrirlas en grande y eliminar o conservar cada una, o todas. Úsala SIEMPRE que hables de fotos concretas, y sobre todo antes de proponer borrar o mover. Devuelve cuántas mostró.', inputSchema: { type: 'object', properties: { titulo: { type: 'string', description: 'Título corto de lo que se muestra, ej. «12 fotos borrosas de marzo»' }, filtros: FILTROS, orden: { type: 'string', enum: ['fecha', 'peso', 'calidad'], description: 'peso = más pesadas primero; calidad = peores primero' } }, required: ['titulo'] },
+      execute: i => { let r = filtrar(i.filtros); if (i.orden === 'peso') r.sort((a, b) => b.size - a.size); else if (i.orden === 'calidad') r.sort((a, b) => quality(a) - quality(b)); if (!r.length) return { mostradas: 0 }; msg.gals = msg.gals || []; msg.gals.push({ title: String(i.titulo || 'Fotos').slice(0, 80), ids: r.slice(0, 300).map(p => p.id), total: r.length }); renderChatSoft(); return { mostradas: Math.min(r.length, 300), total: r.length }; } },
     { name: 'ver_resumen', description: 'Devuelve el resumen actualizado de la galería (conteos por año, mes, tipo, lugar, eventos, duplicados, álbumes).', execute: () => summary() }
   ];
 }
@@ -584,7 +590,7 @@ Reglas:
 - No expliques las funciones de la app ni repitas lo que ya hace sola (agrupar por mes, duplicados, parecidas, borrosas, oscuras, videos pesados o cortos, capturas, carpetas por tipo/evento/lugar/protagonista). Aporta lo que no hace sola: combinar criterios (por ejemplo «La Tata Food» separada por mes, viajes por lugar, años viejos a un álbum «Archivo»), detectar patrones en los datos (meses con muchísimas fotos, lugares repetidos, rachas), y priorizar qué limpiar primero.
 - Cada propuesta debe citar datos reales del resumen. Nada genérico.
 - No repitas sugerencias que ya diste ni las que la persona rechazó; si ya aceptó algo, avanza al siguiente paso.
-- ${tools ? 'Cuando la persona acepte, ejecuta con las herramientas y cuenta el resultado en una frase. Verifica con contar_fotos antes de mover muchas fotos. Para marcar fotos para borrar, primero di cuántas son y pide confirmación.' : 'No puedes cambiar nada tú; explica en una frase qué hacer.'}
+- ${tools ? 'Cuando la persona acepte, ejecuta con las herramientas y cuenta el resultado en una frase. Verifica con contar_fotos antes de mover muchas fotos. Cuando hables de fotos concretas, muéstralas con mostrar_fotos para que la persona las vea; si propones borrar, muéstralas primero y deja que ella elija desde las miniaturas o confirme. Para marcar para borrar con marcar_para_borrar, pide confirmación antes.' : 'No puedes cambiar nada tú; explica en una frase qué hacer.'}
 - Si aún no hay fotos clasificadas por tipo, puedes proponer carpetas por tipo hechas a la medida de lo que ves.
 - Haz una sola pregunta al final.
 - Termina SIEMPRE con una última línea: OPCIONES: respuesta 1 | respuesta 2 | respuesta 3  (2 a 4 respuestas cortas, en primera persona, que la persona podría tocar).
@@ -612,7 +618,7 @@ async function mosaic() {
 }
 function aiHistory() {
   const out = [];
-  S.chat.forEach(m => { const content = (m.role === 'assistant' ? (m.raw || m.text) : m.text) || ''; if (!content.trim()) return; const last = out[out.length - 1]; if (last && last.role === m.role) last.content += '\n' + content; else out.push({ role: m.role, content }); });
+  S.chat.forEach(m => { const content = ((m.role === 'assistant' ? (m.raw || m.text) : m.text) || '') + (m.gals && m.gals.length ? '\n(Le mostré: ' + m.gals.map(g => `${g.title} [${g.ids.filter(id => byId(id) && byId(id).del).length} de ${g.ids.length} eliminadas por ella]`).join('; ') + ')' : ''); if (!content.trim()) return; const last = out[out.length - 1]; if (last && last.role === m.role) last.content += '\n' + content; else out.push({ role: m.role, content }); });
   return out;
 }
 async function aiSend(text, first) {
@@ -640,6 +646,22 @@ async function aiSend(text, first) {
   }
   S.aiBusy = false; if (changed) S.undo = snap; render();
 }
+function showChips() {
+  const c = Object.keys(CLEAN_INFO).map(k => [k, (clean[k] || []).filter(p => !p.del)]).filter(([, l]) => l.length);
+  return c.length ? `<div class="showchips"><small>Ver ahora para decidir qué borrar:</small><div class="quick">${c.map(([k, l]) => `<button data-show="${k}">${CLEAN_INFO[k][0]} (${l.length})</button>`).join('')}</div></div>` : '';
+}
+function showLocal(k) {
+  const l = (clean[k] || []).filter(p => !p.del); if (!l.length) return;
+  S.chat.push({ role: 'user', text: 'Muéstrame: ' + CLEAN_INFO[k][0].toLowerCase() });
+  S.chat.push({ role: 'assistant', text: `${CLEAN_INFO[k][1]} Toca una para verla en grande y decide: **Eliminar** o **Conservar**. Si todas sobran, usa el botón rojo.`, acts: [], opts: [], gals: [{ title: CLEAN_INFO[k][0], ids: l.slice(0, 300).map(p => p.id), total: l.length }] });
+  renderTabs(); renderChat();
+}
+function galHtml(mi, gi, g) {
+  const ps = g.ids.map(byId).filter(Boolean), del = ps.filter(p => p.del), key = 'gal:' + mi + ':' + gi, open = S.expanded.has(key), show = open ? ps : ps.slice(0, 24);
+  return `<div class="chatgal" data-gal="${mi}:${gi}"><div class="ghead" style="margin:0 0 6px"><div><b>${esc(g.title)}</b><br><small>${ps.length}${g.total > ps.length ? ' de ' + g.total : ''} · ${fmtBig(bytes(ps))} · ${del.length} eliminadas · toca una para verla en grande</small></div></div>
+    <div class="grid">${show.map(p => tile(p)).join('')}</div>
+    <div class="row" style="margin-top:8px">${ps.length > 24 ? `<button class="ghost" data-expand="${key}">${open ? 'Ver menos' : 'Ver las ' + ps.length}</button>` : ''}${del.length < ps.length ? `<button class="delbtn" data-galdel="${mi}:${gi}">Eliminar ${ps.length - del.length}</button>` : ''}${del.length ? `<button data-galkeep="${mi}:${gi}">Conservar todas</button>` : ''}</div></div>`;
+}
 let chatRaf = 0;
 function renderChatSoft() { if (chatRaf) return; chatRaf = requestAnimationFrame(() => { chatRaf = 0; renderChat(); }); }
 function renderChat() {
@@ -647,14 +669,14 @@ function renderChat() {
   const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 160;
   if (!S.chat.length) {
     log.innerHTML = `<div class="msg ai">${S.sample ? 'Cuando cargues tus fotos voy a mirarlas, te preguntaré qué quieres lograr y te propondré cómo ordenarlas. Si quieres, prueba conmigo con las fotos de ejemplo.' : 'Ya tengo tus fotos. ¿Empezamos? Te digo qué encontré y cómo te sugiero ordenarlas.'}</div>
-      <div class="quick"><button data-act="aiStart">${S.sample ? 'Probar con las fotos de ejemplo' : 'Analizar mis fotos'}</button></div>${S.aiErr ? `<div class="note">${esc(S.aiErr)}</div>` : ''}`;
+      <div class="quick"><button data-act="aiStart">${S.sample ? 'Probar con las fotos de ejemplo' : 'Analizar mis fotos'}</button></div>${S.aiErr ? `<div class="note">${esc(S.aiErr)}</div>` : ''}${showChips()}`;
     return;
   }
   const last = S.chat[S.chat.length - 1];
-  log.innerHTML = S.chat.map(m => `<div class="msg ${m.role === 'user' ? 'me' : 'ai'}">${m.role === 'user' ? esc(m.text) : (m.text ? md(m.text) : '<span class="thinking">Mirando tus fotos…</span>')}${m.acts && m.acts.length ? `<div class="acts">${m.acts.map(a => '✓ ' + esc(a)).join('<br>')}</div>` : ''}</div>`).join('') +
+  log.innerHTML = S.chat.map(m => `<div class="msg ${m.role === 'user' ? 'me' : 'ai'}">${m.role === 'user' ? esc(m.text) : (m.text ? md(m.text) : '<span class="thinking">Mirando tus fotos…</span>')}${m.acts && m.acts.length ? `<div class="acts">${m.acts.map(a => '✓ ' + esc(a)).join('<br>')}</div>` : ''}${(m.gals || []).map((g, gi) => galHtml(S.chat.indexOf(m), gi, g)).join('')}</div>`).join('') +
     (S.aiBusy ? '<div class="quick"><button data-act="aiStop">Detener</button></div>' :
       `<div class="quick">${last.role === 'assistant' && last.follow === 'classify' ? '<button class="primary" data-act="aiClassify">Clasificar ahora</button>' : ''}${last.role === 'assistant' && last.follow === 'export' ? '<button class="primary" data-act="aiExport">Exportar ahora</button>' : ''}${last.role === 'assistant' ? (last.opts || []).map(o => `<button data-quick="${esc(o)}">${esc(o)}</button>`).join('') : ''}</div>`) +
-    (S.aiErr ? `<div class="note">${esc(S.aiErr)}</div>` : '');
+    (S.aiErr ? `<div class="note">${esc(S.aiErr)}</div>` : '') + (S.aiBusy ? '' : showChips());
   if (nearBottom || S.aiBusy) window.scrollTo(0, document.body.scrollHeight);
 }
 
@@ -810,8 +832,8 @@ function renderBar() {
     <input type="text" id="newAlb" placeholder="Nombre del álbum" hidden aria-label="Nombre del álbum nuevo"><button data-act="newAlbOk" id="newAlbOk" hidden class="primary">Crear y mover</button>
     <button data-act="viewSel">Ver en grande</button><button class="ghost" data-act="clearSel">Cancelar</button></div>`;
 }
-function openViewer(id) {
-  const order = [...document.querySelectorAll('#view .ph')].map(b => +b.dataset.id);
+function openViewer(id, list) {
+  const order = list || [...document.querySelectorAll('#view .ph')].map(b => +b.dataset.id);
   S.viewer = { order: order.includes(id) ? order : [id], i: Math.max(0, order.indexOf(id)) }; drawViewer();
 }
 function drawViewer() {
@@ -829,6 +851,10 @@ function render() { renderStats(); renderNotice(); renderTabs(); renderView(); r
 document.addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
   if (t.dataset.tab) { S.tab = t.dataset.tab; S.sel.clear(); render(); window.scrollTo(0, 0); return; }
+  const gal = t.closest('.chatgal');
+  if (gal && t.dataset.id && t.classList.contains('ph')) { const [mi, gi] = gal.dataset.gal.split(':').map(Number); openViewer(+t.dataset.id, S.chat[mi].gals[gi].ids.filter(byId)); return; }
+  if (t.dataset.show) { showLocal(t.dataset.show); return; }
+  if (t.dataset.galdel || t.dataset.galkeep) { const [mi, gi] = (t.dataset.galdel || t.dataset.galkeep).split(':').map(Number), ids = S.chat[mi].gals[gi].ids; setDel(ids, !!t.dataset.galdel); if (t.dataset.galdel) S.lastClean = ids; renderStats(); renderTabs(); renderChat(); toast(t.dataset.galdel ? `Eliminadas ${ids.length} del respaldo` : 'Conservadas'); saveProgress(); return; }
   if (t.dataset.id && t.classList.contains('ph')) { const id = +t.dataset.id; S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); t.classList.toggle('sel'); renderBar(); return; }
   if (t.dataset.selall !== undefined) { const ids = t.dataset.selall.split(',').filter(Boolean).map(Number); const all = ids.every(i => S.sel.has(i)); ids.forEach(i => all ? S.sel.delete(i) : S.sel.add(i)); renderView(); renderBar(); return; }
   if (t.dataset.cleanids) { const ids = t.dataset.cleanids.split(',').map(Number); setDel(ids, true); S.lastClean = ids; render(); toast(`Eliminadas ${ids.length} del respaldo`); return; }
